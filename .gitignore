@@ -1,0 +1,24 @@
+# Node & Composer Dependencies
+node_modules/
+vendor/
+
+# Environment Configuration
+.env
+.env.*
+!.env.example
+
+# Logs & Operating System Files
+*.log
+.DS_Store
+Thumbs.db
+
+# Build Artifacts & Storage Caches
+dist/
+/backend/storage/logs/*.log
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+
+# IDE Configuration Files
+.vscode/
+.idea/

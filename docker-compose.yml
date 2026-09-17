@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chunkflow_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: virat
+      POSTGRES_PASSWORD: vignesh98
+      POSTGRES_DB: chunkflow_main
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

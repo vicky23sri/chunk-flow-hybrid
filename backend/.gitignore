@@ -1,0 +1,50 @@
+# Dependencies
+/vendor
+/node_modules
+
+# Environment & Local Configuration
+.env
+.env.backup
+.env.production
+.env.local
+.env.testing
+
+# Storage & Logs
+/storage/*.key
+/storage/app/*
+!/storage/app/.gitignore
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+*.log
+
+# Build & Compiled Assets
+/public/build
+/public/storage
+/public/hot
+/public/fonts-manifest.dev.json
+
+# Cache Files
+/.phpunit.cache
+/.phpunit.result.cache
+
+# IDEs & OS System Files
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+.zed
+/.codex
+/.nova
+Homestead.json
+Homestead.yaml
+_ide_helper.php
