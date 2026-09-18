@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   Building2, FolderGit2, HardDrive, ShieldCheck, Plus, Trash2, Lock, 
   RefreshCw, FileText, CheckCircle2, Activity, Database, ExternalLink, 
@@ -15,6 +16,7 @@ import SnapshotExplorer from '../components/tenant/SnapshotExplorer';
 import ConnectionSettingsModal from '../components/tenant/ConnectionSettingsModal';
 
 export default function Dashboard({ user, tenant, onTenantChange }) {
+  const { showSuccess, showError } = useToast();
   const [projects, setProjects] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [bucketPrefix, setBucketPrefix] = useState('');
@@ -72,7 +74,9 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       }
       if (rlsInfo) setRlsInfo(rlsData);
     } catch (err) {
-      setError(err.message || 'Failed to load tenant dashboard data.');
+      const msg = err.message || 'Failed to load tenant dashboard data.';
+      setError(msg);
+      showError(msg, 'Dashboard Error');
     } finally {
       setLoading(false);
     }
@@ -89,8 +93,9 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       setProjectName('');
       setProjectDesc('');
       setShowProjectModal(false);
+      showSuccess(`Project "${newProj.name || projectName}" created successfully!`, 'Project Created');
     } catch (err) {
-      alert('Failed to create project: ' + err.message);
+      showError(err.message || 'Failed to create project.', 'Create Project Failed');
     }
   };
 
@@ -99,8 +104,9 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     try {
       await api.deleteProject(id);
       setProjects(projects.filter((p) => p.id !== id));
+      showSuccess('Project deleted successfully.', 'Project Deleted');
     } catch (err) {
-      alert('Failed to delete project: ' + err.message);
+      showError(err.message || 'Failed to delete project.', 'Delete Project Failed');
     }
   };
 
@@ -114,8 +120,9 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       setDocuments([newDoc, ...documents]);
       setDocName('');
       setShowDocModal(false);
+      showSuccess(`Storage object "${newDoc.name || docName}" logged successfully!`, 'S3 Object Logged');
     } catch (err) {
-      alert('Failed to create document object: ' + err.message);
+      showError(err.message || 'Failed to log storage object.', 'S3 Logging Failed');
     }
   };
 
@@ -123,6 +130,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     const dsn = `postgres://virat:vignesh98@localhost:5432/chunkflow_tenant_${tenant?.subdomain || 'acme'}`;
     navigator.clipboard.writeText(dsn);
     setCopiedDSN(true);
+    showSuccess('PostgreSQL connection string copied to clipboard!', 'DSN Copied');
     setTimeout(() => setCopiedDSN(false), 2000);
   };
 

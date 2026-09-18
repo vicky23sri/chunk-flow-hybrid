@@ -6,13 +6,15 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Login from './pages/Login';
 import RegisterTenant from './pages/RegisterTenant';
 import { api, getToken, clearAuthSession, isSuperAdminSession, getDomainBasedSubdomain, setActiveSubdomain } from './services/api';
+import { ToastProvider, useToast } from './context/ToastContext';
 
 // ─── Domain Detection ─────────────────────────────────────────────────────
 // Computed once at module load — never changes during a page session
 const domainSubdomain = getDomainBasedSubdomain(); // e.g. 'willsparrow' or null
 const isDomainBased = !!domainSubdomain;
 
-export default function App() {
+function AppContent() {
+  const { showSuccess, showError, showInfo } = useToast();
   const [user, setUser]           = useState(null);
   const [tenant, setTenant]       = useState(null);
   const [superAdmin, setSuperAdmin] = useState(null);
@@ -70,11 +72,12 @@ export default function App() {
         setCurrentPage('dashboard');
         setLoading(false);
         // Async token validation (silently logout if expired)
-        api.getMe().catch(() => {
+        api.getMe().catch((err) => {
           clearAuthSession();
           setUser(null);
           setTenant(null);
           setCurrentPage('home');
+          showError(err.message || 'Session expired. Please sign in again.', 'Session Expired');
         });
         return;
       }
@@ -101,6 +104,7 @@ export default function App() {
       setSuperAdmin(null);
       setIsSuperAdmin(false);
       setCurrentPage('home');
+      showError(err.message || 'Session expired. Please sign in again.', 'Session Expired');
     } finally {
       setLoading(false);
     }
@@ -113,6 +117,7 @@ export default function App() {
     setIsSuperAdmin(false);
     setSuperAdmin(null);
     setCurrentPage('dashboard');
+    showSuccess(`Welcome back, ${u.name || u.email}!`, 'Signed In');
   };
 
   const handleSuperAdminSuccess = (admin) => {
@@ -121,6 +126,7 @@ export default function App() {
     setUser(null);
     setTenant(null);
     setCurrentPage('superadmin');
+    showSuccess('Super Admin control session authorized.', 'Central Admin');
   };
 
   const handleLogout = () => {
@@ -130,6 +136,7 @@ export default function App() {
     setSuperAdmin(null);
     setIsSuperAdmin(false);
     setCurrentPage('home');
+    showInfo('You have signed out.', 'Signed Out');
   };
 
   const handleTenantChange = () => {
@@ -274,5 +281,13 @@ export default function App() {
         </footer>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }

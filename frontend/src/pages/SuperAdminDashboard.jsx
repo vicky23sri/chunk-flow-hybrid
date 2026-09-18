@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   Crown, Database, Globe, Users, Plus, Building2, ShieldCheck, 
   Terminal, Activity, RefreshCw, AlertCircle, ExternalLink, FolderGit2
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
+  const { showSuccess, showError } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,7 +30,9 @@ export default function SuperAdminDashboard() {
       const res = await api.getSuperAdminDashboard();
       setData(res);
     } catch (err) {
-      setError(err.message || 'Failed to load Super Admin dashboard');
+      const msg = err.message || 'Failed to load Super Admin dashboard';
+      setError(msg);
+      showError(msg, 'Control Plane Error');
     } finally {
       setLoading(false);
     }
@@ -44,7 +48,7 @@ export default function SuperAdminDashboard() {
         admin_password: adminPassword,
       });
 
-      alert(`Tenant '${tenantName}' and physical database 'chunkflow_tenant_${subdomain}' provisioned successfully!`);
+      showSuccess(`Tenant '${tenantName}' & physical database 'chunkflow_tenant_${subdomain}' provisioned successfully!`, 'Workspace Provisioned');
       setTenantName('');
       setSubdomain('');
       setAdminEmail('');
@@ -52,7 +56,7 @@ export default function SuperAdminDashboard() {
       setShowProvisionModal(false);
       loadDashboard();
     } catch (err) {
-      alert('Failed to provision tenant: ' + err.message);
+      showError(err.message || 'Failed to provision tenant.', 'Provisioning Failed');
     }
   };
 
