@@ -10,6 +10,29 @@ function getApiBaseUrl() {
   return 'http://localhost:8000/api/v1';
 }
 
+function extractErrorMessage(response, data) {
+  if (data) {
+    if (typeof data === 'string' && data.trim().length > 0) return data;
+    if (data.message && typeof data.message === 'string') return data.message;
+    if (data.error && typeof data.error === 'string') return data.error;
+    if (data.errors) {
+      if (Array.isArray(data.errors)) return data.errors.join(', ');
+      if (typeof data.errors === 'object') return Object.values(data.errors).flat().join(', ');
+    }
+  }
+  switch (response.status) {
+    case 400: return 'Bad Request: Invalid parameters sent to the server.';
+    case 401: return 'Authentication Failed: Invalid credentials or session expired.';
+    case 403: return 'Access Denied: You do not have permission to access this resource.';
+    case 404: return 'Not Found: Workspace domain, tenant, or API route does not exist.';
+    case 422: return 'Validation Failed: Please check your input fields.';
+    case 500: return 'Server Error (500): Internal server failure. Ensure the tenant database exists and backend is running.';
+    case 502: return 'Bad Gateway: Backend server is unreachable.';
+    case 503: return 'Service Unavailable: Backend service is temporarily offline.';
+    default: return `HTTP Error ${response.status}: An unexpected error occurred.`;
+  }
+}
+
 export function getActiveSubdomain() {
   const storedSubdomain = localStorage.getItem('tenant_subdomain');
   if (storedSubdomain) {
@@ -21,7 +44,7 @@ export function getActiveSubdomain() {
   const parts = host.split('.');
   if (parts.length >= 2) {
     const sub = parts[0];
-    if (sub !== 'www' && sub !== 'localhost' && sub !== 'app' && sub !== '127' && sub !== 'api') {
+    if (sub !== 'www' && sub !== 'localhost' && sub !== 'app' && sub !== '127' && sub !== 'api' && sub !== 'chunkflow') {
       return sub.toLowerCase();
     }
   }
@@ -37,7 +60,7 @@ export function getDomainBasedSubdomain() {
   const parts = host.split('.');
   if (parts.length >= 2) {
     const sub = parts[0];
-    if (sub !== 'www' && sub !== 'localhost' && sub !== 'app' && sub !== '127' && sub !== 'api') {
+    if (sub !== 'www' && sub !== 'localhost' && sub !== 'app' && sub !== '127' && sub !== 'api' && sub !== 'chunkflow') {
       return sub.toLowerCase();
     }
   }
@@ -102,15 +125,19 @@ async function request(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  const data = await response.json().catch(() => ({}));
+  let response, data;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+    data = await response.json().catch(() => ({}));
+  } catch (netErr) {
+    throw new Error('Network Error: Unable to connect to backend server at ' + API_BASE_URL);
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || `HTTP error ${response.status}`);
+    throw new Error(extractErrorMessage(response, data));
   }
 
   return data;
@@ -129,15 +156,19 @@ async function centralRequest(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  const data = await response.json().catch(() => ({}));
+  let response, data;
+  try {
+    response = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
+      ...options,
+      headers,
+    });
+    data = await response.json().catch(() => ({}));
+  } catch (netErr) {
+    throw new Error('Network Error: Unable to connect to central backend server at http://localhost:8000');
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || `HTTP error ${response.status}`);
+    throw new Error(extractErrorMessage(response, data));
   }
 
   return data;

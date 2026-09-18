@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api, getActiveSubdomain, setActiveSubdomain } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { Globe, ChevronDown } from 'lucide-react';
 
 export default function TenantSwitcher({ onTenantChange }) {
+  const { showInfo } = useToast();
   const [tenants, setTenants] = useState([]);
   const [activeSub, setActiveSub] = useState(getActiveSubdomain());
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ export default function TenantSwitcher({ onTenantChange }) {
   const handleSelect = (subdomain) => {
     setActiveSub(subdomain);
     setActiveSubdomain(subdomain);
+    showInfo(`Switched active workspace domain context to '${subdomain}'`, 'Domain Scope Changed');
     if (onTenantChange) {
       onTenantChange(subdomain);
     }
