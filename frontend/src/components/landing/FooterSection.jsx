@@ -4,9 +4,9 @@ import { Cpu } from 'lucide-react';
 export default function FooterSection() {
   return (
     <footer className="w-full bg-[#0c0c0c] text-white pt-16 pb-0 border-t border-slate-800 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+      <div className="max-w-7xl mx-auto px-3 mb-12">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 text-left">
-          
+
           {/* Col 1: Brand & Contact Email */}
           <div className="md:col-span-6 flex flex-col justify-between">
             <div>

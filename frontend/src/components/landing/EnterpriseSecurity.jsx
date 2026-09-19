@@ -92,13 +92,13 @@ export default function EnterpriseSecurity() {
   const activeItem = securityItems[activeStep];
 
   return (
-    <section 
-      ref={containerRef} 
+    <section
+      ref={containerRef}
       className="relative w-full bg-white text-slate-900 border-b border-slate-200/80 min-h-[300vh]"
     >
       {/* Sticky Viewport Container: Stays fixed on screen while scrolling through the 300vh height */}
-      <div className="sticky top-0 h-screen flex flex-col justify-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-hidden">
-        
+      <div className="sticky top-0 h-screen flex flex-col justify-center max-w-7xl mx-auto px-3 py-8 overflow-hidden">
+
         {/* Centered Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-6 shrink-0">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#f95716] text-xs font-mono font-bold tracking-wider uppercase mb-3">
@@ -119,15 +119,13 @@ export default function EnterpriseSecurity() {
             <button
               key={item.id}
               onClick={() => setActiveStep(index)}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 border ${
-                activeStep === index
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 border ${activeStep === index
                   ? 'bg-slate-950 text-white border-slate-950 shadow-md scale-105'
                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-              }`}
+                }`}
             >
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-black transition-colors ${
-                activeStep === index ? 'bg-[#f95716] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-black transition-colors ${activeStep === index ? 'bg-[#f95716] text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
                 {item.id}
               </span>
               <span>{item.tabLabel}</span>
@@ -137,7 +135,7 @@ export default function EnterpriseSecurity() {
 
         {/* Scroll Progress Bar Visual Indicator */}
         <div className="max-w-md mx-auto w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-8 shrink-0">
-          <div 
+          <div
             className="h-full bg-[#f95716] transition-all duration-500 ease-out rounded-full"
             style={{ width: `${((activeStep + 1) / 3) * 100}%` }}
           />
@@ -145,11 +143,11 @@ export default function EnterpriseSecurity() {
 
         {/* Active Showcase Item (Single item visible: hides current when scrolling to next) */}
         <div className="max-w-6xl mx-auto w-full">
-          <div 
-            key={activeItem.id} 
+          <div
+            key={activeItem.id}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center transition-all duration-500 animate-fadeIn"
           >
-            
+
             {/* Left Column with Vertical Orange Accent Line */}
             <div className="lg:col-span-6 flex flex-col text-left border-l-4 border-[#f95716] pl-6 sm:pl-8 py-2">
               {/* Step Index Badge */}

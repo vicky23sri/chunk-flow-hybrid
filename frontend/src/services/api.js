@@ -246,11 +246,94 @@ export const api = {
       }
       return data;
     } catch (err) {
-      // Fallback: If Go server is not running, return clear notice
       return {
         success: false,
         message: `Network Error: Unable to reach Go Backend at ${GO_API_BASE}. Please ensure \`go run cmd/main.go\` is running in go_backend directory.`,
       };
     }
   },
+
+  // ─── Go Backend: Save node config to tenant DB via /tenant-config ─────────
+  saveTenantConfig: async (payload) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/tenant-config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Subdomain': subdomain,
+        },
+        body: JSON.stringify({ subdomain, ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, message: data.message, ...data };
+    } catch (err) {
+      return {
+        success: false,
+        message: `Network Error: Cannot reach Go Backend at ${GO_API_BASE}.`,
+      };
+    }
+  },
+
+  // ─── Go Backend: Read back saved node configs via GET /tenant-config ─────
+  getTenantConfig: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/tenant-config?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: {
+          'X-Tenant-Subdomain': subdomain,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, postgres: data.postgres || [], s3: data.s3 || [] };
+    } catch (err) {
+      return { success: false, postgres: [], s3: [] };
+    }
+  },
+
+  // ─── Go Backend: Deploy workflow pipeline to tenant DB via /workflow/deploy ──
+  deployWorkflow: async (payload) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/workflow/deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Subdomain': subdomain,
+        },
+        body: JSON.stringify({ subdomain, ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, message: data.message, ...data };
+    } catch (err) {
+      return {
+        success: false,
+        message: `Network Error: Cannot reach Go Backend at ${GO_API_BASE}.`,
+      };
+    }
+  },
+
+  // ─── Go Backend: Get deployed workflows for tenant ────────────────────────
+  getWorkflows: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/workflows?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: {
+          'X-Tenant-Subdomain': subdomain,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, workflows: data.workflows || [] };
+    } catch (err) {
+      return { success: false, workflows: [] };
+    }
+  },
 };
+
+// Named exports for convenient direct importing
+export const getTenantConfig = (...args) => api.getTenantConfig(...args);
+export const getWorkflows = (...args) => api.getWorkflows(...args);
+export const deployWorkflow = (...args) => api.deployWorkflow(...args);
+export const saveTenantConfig = (...args) => api.saveTenantConfig(...args);
+export const testDBConnection = (...args) => api.testDBConnection(...args);
+

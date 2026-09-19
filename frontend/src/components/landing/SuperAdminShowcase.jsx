@@ -3,15 +3,15 @@ import { Crown, ShieldCheck, Database, Globe, CheckCircle2, ArrowRight, Server, 
 
 export default function SuperAdminShowcase({ onQuickLogin }) {
   return (
-    <section className="w-full bg-slate-950 text-white py-20 px-4 sm:px-6 lg:px-8 border-y border-slate-800/80 relative overflow-hidden">
+    <section className="w-full bg-slate-950 text-white py-20 px-3 border-y border-slate-800/80 relative overflow-hidden">
       {/* Background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none" />
 
       <div className="max-w-7xl mx-auto relative z-10">
-        
+
         {/* 2-Column Section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          
+
           {/* Left Column: Storytelling & Key Points */}
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
@@ -83,7 +83,7 @@ export default function SuperAdminShowcase({ onQuickLogin }) {
           {/* Right Column: Product Showcase Card */}
           <div className="lg:col-span-6">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden text-slate-100">
-              
+
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
                 <div className="flex items-center gap-2">

@@ -11,7 +11,7 @@ import { api } from '../../services/api';
 import { showSuccess, showError, showWarning } from '../../utils/toast';
 import { useFormValidation } from '../../hooks/useFormValidation';
 
-export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
+export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflow }) {
   const { errors, validatePostgres, validateS3, clearErrors, clearFieldError } = useFormValidation();
 
   // Available tenant databases list
@@ -30,6 +30,80 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploySuccess, setDeploySuccess] = useState(false);
   const [connectingSourceId, setConnectingSourceId] = useState(null);
+
+  // Load specific workflow data onto canvas when initialWorkflow prop changes
+  useEffect(() => {
+    if (initialWorkflow) {
+      let loadedNodes = [];
+      let loadedConns = [];
+
+      try {
+        if (Array.isArray(initialWorkflow.nodes_data)) {
+          loadedNodes = initialWorkflow.nodes_data;
+        } else if (typeof initialWorkflow.nodes_data === 'string') {
+          loadedNodes = JSON.parse(initialWorkflow.nodes_data);
+        } else if (Array.isArray(initialWorkflow.nodes)) {
+          loadedNodes = initialWorkflow.nodes;
+        }
+      } catch (e) {}
+
+      try {
+        if (Array.isArray(initialWorkflow.connections_data)) {
+          loadedConns = initialWorkflow.connections_data;
+        } else if (typeof initialWorkflow.connections_data === 'string') {
+          loadedConns = JSON.parse(initialWorkflow.connections_data);
+        } else if (Array.isArray(initialWorkflow.connections)) {
+          loadedConns = initialWorkflow.connections;
+        }
+      } catch (e) {}
+
+      if (loadedNodes && loadedNodes.length > 0) {
+        setNodes(loadedNodes);
+        setConnections(loadedConns || []);
+        setSelectedNodeId(loadedNodes[0]?.id || null);
+        showSuccess(`Loaded pipeline canvas for "${initialWorkflow.name || 'Snapshot Workflow'}"!`, 'Workflow Canvas Loaded');
+      } else {
+        // Build interactive connected PostgreSQL -> S3 nodes for this snapshot
+        const pgId = `node_source_${Date.now()}`;
+        const s3Id = `node_destination_${Date.now() + 1}`;
+        const defaultPgNode = {
+          id: pgId,
+          type: 'source',
+          subtype: 'postgres',
+          x: 80,
+          y: 160,
+          isValid: true,
+          title: 'PostgreSQL Database Source',
+          subtitle: initialWorkflow.source_name || `chunkflow_tenant_${tenant?.subdomain || 'acme'}`,
+          config: {
+            host: 'localhost',
+            port: '5432',
+            database: `chunkflow_tenant_${tenant?.subdomain || 'acme'}`,
+            username: 'virat',
+            password: '•••',
+          },
+        };
+        const defaultS3Node = {
+          id: s3Id,
+          type: 'destination',
+          subtype: 's3',
+          x: 460,
+          y: 160,
+          isValid: true,
+          title: 'Amazon S3 Vault Destination',
+          subtitle: initialWorkflow.destination_name || 's3://chunkflow-vault-raw/',
+          config: {
+            bucketName: 'chunkflow-vault-raw',
+            folderPath: `snapshots/${tenant?.subdomain || 'tenant'}/`,
+          },
+        };
+        setNodes([defaultPgNode, defaultS3Node]);
+        setConnections([{ id: `conn_${Date.now()}`, sourceId: pgId, targetId: s3Id }]);
+        setSelectedNodeId(pgId);
+        showSuccess(`Loaded canvas for "${initialWorkflow.name || 'Snapshot Pipeline'}"!`, 'Pipeline Loaded');
+      }
+    }
+  }, [initialWorkflow?.id]);
 
   // Clear Canvas Confirm Modal State
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
@@ -228,7 +302,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
     }
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (!selectedNodeId || !selectedNode) return;
 
     let isValid = true;
@@ -240,15 +314,29 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
 
     if (!isValid) return;
 
+    // Save to localStorage (fast / offline-safe)
     if (selectedNode.subtype === 'postgres') {
       savePostgresConfig(selectedNode.config);
     } else if (selectedNode.subtype === 's3') {
       saveS3Config(selectedNode.config);
     }
+
+    // Persist to tenant database via Go backend /tenant-config
+    const result = await api.saveTenantConfig(
+      selectedNode.subtype === 'postgres'
+        ? { postgres: selectedNode.config }
+        : { s3: selectedNode.config }
+    );
+
+    if (!result.success) {
+      showError(result.message || 'Failed to save configuration to database.', 'DB Save Failed');
+      return;
+    }
+
     setNodes((prev) =>
       prev.map((n) => (n.id === selectedNodeId ? { ...n, isValid: true } : n))
     );
-    showSuccess('Node configuration saved successfully!', 'Config Saved');
+    showSuccess('Node configuration saved to database!', 'Config Saved');
   };
 
   const handleTestConnection = async () => {
@@ -377,7 +465,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
     );
   };
 
-  const handleDeploy = () => {
+  const handleDeploy = async () => {
     if (nodes.length === 0) {
       showWarning('Cannot deploy an empty canvas. Please add source and destination nodes.', 'Canvas Empty');
       return;
@@ -399,13 +487,33 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
 
     setIsDeploying(true);
     setDeploySuccess(false);
-    setTimeout(() => {
-      setIsDeploying(false);
+
+    // Extract postgres source and s3 destination node configs
+    const postgresNode = nodes.find((n) => n.subtype === 'postgres');
+    const s3Node = nodes.find((n) => n.subtype === 's3');
+
+    const res = await api.deployWorkflow({
+      workflowName: 'PostgreSQL -> S3 Vault Data Pipeline',
+      nodes,
+      connections,
+      postgres: postgresNode?.config,
+      s3: s3Node?.config,
+    });
+
+    setIsDeploying(false);
+
+    if (res && res.success) {
       setDeploySuccess(true);
       setNodes((prev) => prev.map((n) => ({ ...n, isValid: true })));
-      if (onSaveWorkflow) onSaveWorkflow({ nodes, connections });
+      if (onSaveWorkflow) onSaveWorkflow({ nodes, connections, deployment: res });
+      showSuccess(
+        res.message || 'Workflow pipeline deployed and mapped in tenant database!',
+        'Workflow Deployed'
+      );
       setTimeout(() => setDeploySuccess(false), 4000);
-    }, 1000);
+    } else {
+      showError(res?.message || 'Failed to deploy workflow to database.', 'Deployment Failed');
+    }
   };
 
   const handleClearCanvas = () => {

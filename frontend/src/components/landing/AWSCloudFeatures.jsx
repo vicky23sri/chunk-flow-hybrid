@@ -36,7 +36,7 @@ export default function AWSCloudFeatures() {
   ];
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <section className="w-full max-w-7xl mx-auto px-3 py-20">
       <div className="text-center mb-12">
         <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
           Built for High-Scale Multi-Tenant Data Systems
@@ -53,7 +53,7 @@ export default function AWSCloudFeatures() {
         {features.map((feat, idx) => {
           const IconComponent = feat.icon;
           return (
-            <div 
+            <div
               key={idx}
               className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between"
             >
