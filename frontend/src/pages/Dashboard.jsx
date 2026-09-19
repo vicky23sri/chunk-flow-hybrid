@@ -25,8 +25,14 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   
   // Navigation active section: 'overview', 'workflow', 'scheduler', 'snapshots', 'projects', 's3', 'security'
   const [activeSection, setActiveSection] = useState('overview');
+  const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [copiedDSN, setCopiedDSN] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  const handleNavigateToBuilder = (wf = null) => {
+    setSelectedWorkflow(wf);
+    setActiveSection('workflow');
+  };
 
   // Sidebar Collapse / Expand State (Auto-collapsed on mobile & tablet)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
@@ -56,28 +62,37 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [tenant?.id]);
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const [snapshotCount, setSnapshotCount] = useState(0);
+
+  const loadDashboardData = async (isInitial = true) => {
+    if (isInitial) setLoading(true);
     setError('');
     try {
-      const [projData, docData, rlsData] = await Promise.all([
+      const results = await Promise.allSettled([
         api.getProjects(),
         api.getDocuments(),
         api.getRLSStatus(),
+        api.getWorkflows(),
       ]);
 
-      if (Array.isArray(projData)) setProjects(projData);
-      if (docData && docData.documents) {
-        setDocuments(docData.documents);
-        setBucketPrefix(docData.bucket_prefix);
+      const projRes = results[0].status === 'fulfilled' ? results[0].value : [];
+      const docRes = results[1].status === 'fulfilled' ? results[1].value : null;
+      const rlsRes = results[2].status === 'fulfilled' ? results[2].value : null;
+      const wfRes = results[3].status === 'fulfilled' ? results[3].value : null;
+
+      if (Array.isArray(projRes)) setProjects(projRes);
+      if (docRes && docRes.documents) {
+        setDocuments(docRes.documents);
+        setBucketPrefix(docRes.bucket_prefix);
       }
-      if (rlsInfo) setRlsInfo(rlsData);
+      if (rlsRes) setRlsInfo(rlsRes);
+      if (wfRes && Array.isArray(wfRes.workflows)) {
+        setSnapshotCount(wfRes.workflows.length);
+      }
     } catch (err) {
-      const msg = err.message || 'Failed to load tenant dashboard data.';
-      setError(msg);
-      showError(msg, 'Dashboard Error');
+      console.error('Failed to load dashboard data:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
@@ -173,7 +188,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       group: 'BACKUP & PIPELINES',
       items: [
         { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
-        { id: 'snapshots', label: 'Snapshots & Vault', icon: Database, badge: '24' },
+        { id: 'snapshots', label: 'Snapshots & Vault', icon: Database, badge: String(snapshotCount) },
       ],
     },
     {
@@ -493,7 +508,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
 
         {/* ── SECTION: WORKFLOW BUILDER ───────────────────────────────── */}
         {activeSection === 'workflow' && (
-          <WorkflowBuilder tenant={tenant} />
+          <WorkflowBuilder tenant={tenant} initialWorkflow={selectedWorkflow} />
         )}
 
         {/* ── SECTION: BACKUP SCHEDULER ───────────────────────────────── */}
@@ -503,7 +518,11 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
 
         {/* ── SECTION: SNAPSHOTS EXPLORER ─────────────────────────────── */}
         {activeSection === 'snapshots' && (
-          <SnapshotExplorer tenant={tenant} />
+          <SnapshotExplorer 
+            tenant={tenant} 
+            onNavigateToBuilder={handleNavigateToBuilder}
+            onSnapshotChange={() => loadDashboardData(false)}
+          />
         )}
 
         {/* ── SECTION: PROJECTS ───────────────────────────────────────── */}

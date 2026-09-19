@@ -7,12 +7,12 @@ export default function HeroSection({ user, superAdmin, isSuperAdmin, onNavigate
 
   return (
     <section className="w-full bg-white pt-12 pb-16 text-slate-900 border-b border-slate-200/80 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
+
           {/* Left Column: Hero Content */}
           <div className="lg:col-span-6 flex flex-col text-left">
-            
+
             {/* Top Pill Tag */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono font-bold tracking-wider uppercase mb-6 self-start">
               <span>CHUNKFLOW ENGINE</span>
@@ -42,8 +42,8 @@ export default function HeroSection({ user, superAdmin, isSuperAdmin, onNavigate
                   {isSuperAdmin || superAdmin
                     ? 'Go to Super Admin'
                     : user
-                    ? 'Go to Workspace'
-                    : 'Get Started'}
+                      ? 'Go to Workspace'
+                      : 'Get Started'}
                 </span>
                 <ArrowRight size={15} />
               </button>
@@ -61,7 +61,7 @@ export default function HeroSection({ user, superAdmin, isSuperAdmin, onNavigate
 
             {/* Rating Cards Grid */}
             <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-200/80 max-w-md">
-              
+
               <div className="bg-slate-50/80 border border-slate-200/80 p-4 rounded-2xl flex flex-col justify-between">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Deduplication
@@ -97,7 +97,7 @@ export default function HeroSection({ user, superAdmin, isSuperAdmin, onNavigate
             <div className="relative w-full max-w-lg lg:max-w-none flex justify-center items-center">
               {/* Soft Ambient Background Glow */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
-              
+
               {/* Clean Transparent Isometric Artwork (No background frame/box) */}
               <img
                 src={heroEngineImg}

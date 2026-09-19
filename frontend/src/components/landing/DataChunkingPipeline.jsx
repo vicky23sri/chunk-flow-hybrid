@@ -5,9 +5,9 @@ import smartSlicingImg from '../../assets/feature_smart_slicing_iso_178962210113
 export default function DataChunkingPipeline() {
   return (
     <section className="w-full bg-white py-16 text-slate-900 border-b border-slate-200/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
+
           {/* Left Column: Isometric 3D Artwork (No background frame/box) */}
           <div className="lg:col-span-6 relative flex justify-center items-center order-2 lg:order-1">
             <img
@@ -34,7 +34,7 @@ export default function DataChunkingPipeline() {
 
             {/* Sub-Features Grid (2 Columns) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              
+
               <div className="flex flex-col text-left">
                 <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 text-[#f95716] flex items-center justify-center mb-3">
                   <Cpu size={18} />

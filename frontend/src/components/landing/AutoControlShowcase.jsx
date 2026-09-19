@@ -58,7 +58,7 @@ export default function AutoControlShowcase({ onQuickLogin }) {
 
   return (
     <section className="w-full bg-[#08080a] text-white py-24 relative overflow-hidden border-y border-slate-800/80">
-      
+
       {/* Top Edge Glowing Orange Accent Line */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#f95716] to-transparent opacity-90" />
 
@@ -66,8 +66,8 @@ export default function AutoControlShowcase({ onQuickLogin }) {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] bg-[#f95716]/10 rounded-full blur-[180px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-amber-500/5 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
+      <div className="max-w-7xl mx-auto px-3 relative z-10">
+
         {/* Centered Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[#f95716] text-xs font-mono font-bold tracking-wider uppercase mb-5 backdrop-blur-md shadow-lg shadow-orange-500/5">
@@ -121,7 +121,7 @@ export default function AutoControlShowcase({ onQuickLogin }) {
 
                 {/* 3. HOVER STATE: Sleek Slide-Up Glassmorphic Content Sheet */}
                 <div className="absolute inset-0 z-20 p-5 sm:p-6 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-all duration-500 ease-out pointer-events-none group-hover:pointer-events-auto transform translate-y-6 group-hover:translate-y-0">
-                  
+
                   {/* Top Badges Header */}
                   <div className="flex items-center justify-between">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#f95716] text-xs font-mono font-bold border border-white/15 backdrop-blur-md shadow-md">
@@ -138,7 +138,7 @@ export default function AutoControlShowcase({ onQuickLogin }) {
 
                   {/* Middle Content Box (Glass Container) */}
                   <div className="bg-[#0b0c10]/85 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl my-auto space-y-3">
-                    
+
                     {/* Title & Subtitle */}
                     <div>
                       <h3 className="text-xl font-bold text-white tracking-tight leading-snug">

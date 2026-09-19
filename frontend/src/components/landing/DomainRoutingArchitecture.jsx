@@ -5,9 +5,9 @@ import multiTenantImg from '../../assets/feature_multi_tenant_iso_1789622083140.
 export default function DomainRoutingArchitecture() {
   return (
     <section className="w-full bg-white py-16 text-slate-900 border-b border-slate-200/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
+
           {/* Left Column: Text & Features */}
           <div className="lg:col-span-6 flex flex-col text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#f95716] text-xs font-mono font-bold tracking-wider uppercase mb-5 self-start">
@@ -25,7 +25,7 @@ export default function DomainRoutingArchitecture() {
 
             {/* Sub-Features Grid (2 Columns) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              
+
               <div className="flex flex-col text-left">
                 <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 text-[#f95716] flex items-center justify-center mb-3">
                   <Database size={18} />
