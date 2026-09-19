@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api, getActiveSubdomain, setActiveSubdomain } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { showInfo } from '../utils/toast';
 import { Globe, ChevronDown } from 'lucide-react';
 
 export default function TenantSwitcher({ onTenantChange }) {
-  const { showInfo } = useToast();
   const [tenants, setTenants] = useState([]);
   const [activeSub, setActiveSub] = useState(getActiveSubdomain());
   const [loading, setLoading] = useState(false);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Plug, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Plug, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function PostgresConfigForm({
   config = {},
@@ -9,6 +9,7 @@ export default function PostgresConfigForm({
   onTestConnection,
   isTesting,
   testResult,
+  errors = {},
   readOnly = false,
 }) {
   const handleChange = (key, value) => {
@@ -19,15 +20,27 @@ export default function PostgresConfigForm({
     <div className="space-y-4 text-xs text-left">
       {/* Host */}
       <div>
-        <label className="text-xs font-bold text-slate-800 block mb-1">Host *</label>
+        <label className="text-xs font-bold text-slate-800 block mb-1">
+          Host <span className="text-rose-500">*</span>
+        </label>
         <input
           type="text"
           value={config.host ?? ''}
           placeholder="e.g. localhost or 127.0.0.1"
           disabled={readOnly}
           onChange={(e) => handleChange('host', e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono font-medium outline-none shadow-xs transition-all"
+          className={`w-full ${
+            errors?.host
+              ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900'
+              : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900'
+          } rounded-xl px-3.5 py-2.5 text-xs font-mono font-medium outline-none shadow-xs transition-all`}
         />
+        {errors?.host && (
+          <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+            <AlertCircle size={12} className="shrink-0 text-rose-500" />
+            {errors.host}
+          </span>
+        )}
       </div>
 
       {/* Port & Database */}
@@ -40,38 +53,74 @@ export default function PostgresConfigForm({
             placeholder="e.g. 5432"
             disabled={readOnly}
             onChange={(e) => handleChange('port', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono font-medium outline-none shadow-xs transition-all"
+            className={`w-full ${
+              errors?.port
+                ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900'
+                : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900'
+            } rounded-xl px-3.5 py-2.5 text-xs font-mono font-medium outline-none shadow-xs transition-all`}
           />
+          {errors?.port && (
+            <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+              <AlertCircle size={12} className="shrink-0 text-rose-500" />
+              {errors.port}
+            </span>
+          )}
         </div>
         <div>
-          <label className="text-xs font-bold text-slate-800 block mb-1">Database Name *</label>
+          <label className="text-xs font-bold text-slate-800 block mb-1">
+            Database Name <span className="text-rose-500">*</span>
+          </label>
           <input
             type="text"
             value={config.database ?? ''}
             placeholder="e.g. chunkflow_tenant_acme"
             disabled={readOnly}
             onChange={(e) => handleChange('database', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-sky-600 font-mono font-bold outline-none shadow-xs transition-all"
+            className={`w-full ${
+              errors?.database
+                ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900 font-bold'
+                : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-sky-600 font-bold'
+            } rounded-xl px-3.5 py-2.5 text-xs font-mono outline-none shadow-xs transition-all`}
           />
+          {errors?.database && (
+            <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+              <AlertCircle size={12} className="shrink-0 text-rose-500" />
+              {errors.database}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Username */}
       <div>
-        <label className="text-xs font-bold text-slate-800 block mb-1">Username *</label>
+        <label className="text-xs font-bold text-slate-800 block mb-1">
+          Username <span className="text-rose-500">*</span>
+        </label>
         <input
           type="text"
           value={config.username ?? ''}
           placeholder="e.g. postgres or db_user"
           disabled={readOnly}
           onChange={(e) => handleChange('username', e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono font-medium outline-none shadow-xs transition-all"
+          className={`w-full ${
+            errors?.username
+              ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900'
+              : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900'
+          } rounded-xl px-3.5 py-2.5 text-xs font-mono font-medium outline-none shadow-xs transition-all`}
         />
+        {errors?.username && (
+          <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+            <AlertCircle size={12} className="shrink-0 text-rose-500" />
+            {errors.username}
+          </span>
+        )}
       </div>
 
       {/* Password with Eye Toggle */}
       <div>
-        <label className="text-xs font-bold text-slate-800 block mb-1">Password *</label>
+        <label className="text-xs font-bold text-slate-800 block mb-1">
+          Password <span className="text-rose-500">*</span>
+        </label>
         <div className="relative flex items-center">
           <input
             type={showPassword ? 'text' : 'password'}
@@ -79,7 +128,11 @@ export default function PostgresConfigForm({
             placeholder="Enter database password..."
             disabled={readOnly}
             onChange={(e) => handleChange('password', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-slate-900 outline-none shadow-xs transition-all font-mono"
+            className={`w-full ${
+              errors?.password
+                ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900'
+                : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900'
+            } rounded-xl pl-3.5 pr-10 py-2.5 text-xs outline-none shadow-xs transition-all font-mono`}
           />
           {onTogglePassword && (
             <button
@@ -92,6 +145,12 @@ export default function PostgresConfigForm({
             </button>
           )}
         </div>
+        {errors?.password && (
+          <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+            <AlertCircle size={12} className="shrink-0 text-rose-500" />
+            {errors.password}
+          </span>
+        )}
       </div>
 
       {/* SSL Checkbox */}
@@ -136,26 +195,36 @@ export default function PostgresConfigForm({
             placeholder="e.g. 30"
             disabled={readOnly}
             onChange={(e) => handleChange('retentionDays', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium outline-none shadow-xs transition-all"
+            className={`w-full ${
+              errors?.retentionDays
+                ? 'bg-rose-50/40 border border-rose-300 focus:bg-white focus:border-rose-500 text-rose-900'
+                : 'bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900'
+            } rounded-xl px-3.5 py-2.5 text-xs font-medium outline-none shadow-xs transition-all`}
           />
+          {errors?.retentionDays && (
+            <span className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in duration-150">
+              <AlertCircle size={12} className="shrink-0 text-rose-500" />
+              {errors.retentionDays}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Test Connection Result Notice */}
-      {testResult && (
-        <div
-          className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
-            testResult.type === 'success' || testResult.success
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-medium'
-              : 'bg-rose-50 text-rose-900 border-rose-200 font-medium'
-          }`}
-        >
-          {testResult.type === 'success' || testResult.success ? (
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
-          )}
-          <span className="leading-relaxed">{testResult.message || testResult.msg}</span>
+      {/* Test Connection Disclaimer & Status */}
+      {testResult && (testResult.success || testResult.type === 'success') && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-emerald-100/50 border border-emerald-300/80 text-emerald-900 text-xs font-medium shadow-xs animate-in fade-in zoom-in-95 duration-200 space-y-1 relative overflow-hidden">
+          <div className="flex items-center gap-2 text-emerald-800 font-bold">
+            <div className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <CheckCircle2 size={14} />
+            </div>
+            <span className="text-xs font-black tracking-tight text-emerald-950">Connection Verified</span>
+            <span className="ml-auto text-[10px] font-mono bg-emerald-200/90 text-emerald-900 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
+              Save Active
+            </span>
+          </div>
+          <p className="text-[11px] text-emerald-700 leading-snug pl-8">
+            <strong className="font-bold text-emerald-900">Disclaimer:</strong> PostgreSQL database parameters authenticated successfully. The <span className="font-bold text-slate-900 underline decoration-emerald-500 decoration-2">"Save Config"</span> button is now activated.
+          </p>
         </div>
       )}
 
@@ -172,7 +241,7 @@ export default function PostgresConfigForm({
           ) : (
             <Plug size={14} className="text-blue-600" />
           )}
-          <span>{isTesting ? 'Testing PostgreSQL Connection...' : 'Test PostgreSQL Connection'}</span>
+          <span>{isTesting ? 'Testing Connection...' : 'Test Connection'}</span>
         </button>
       )}
     </div>

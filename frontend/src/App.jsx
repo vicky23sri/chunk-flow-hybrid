@@ -6,7 +6,9 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Login from './pages/Login';
 import RegisterTenant from './pages/RegisterTenant';
 import { api, getToken, clearAuthSession, isSuperAdminSession, getDomainBasedSubdomain, setActiveSubdomain } from './services/api';
-import { ToastProvider, useToast } from './context/ToastContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { showSuccess, showError, showInfo } from './utils/toast';
 
 // ─── Domain Detection ─────────────────────────────────────────────────────
 // Computed once at module load — never changes during a page session
@@ -14,7 +16,7 @@ const domainSubdomain = getDomainBasedSubdomain(); // e.g. 'willsparrow' or null
 const isDomainBased = !!domainSubdomain;
 
 function AppContent() {
-  const { showSuccess, showError, showInfo } = useToast();
+
   const [user, setUser]           = useState(null);
   const [tenant, setTenant]       = useState(null);
   const [superAdmin, setSuperAdmin] = useState(null);
@@ -163,7 +165,8 @@ function AppContent() {
   const handleNavigateRegister = () => {
     if (redirectLoggedInUser()) return;
     if (isDomainBased) {
-      window.location.href = 'http://localhost:5173';
+      const centralHost = window.location.host.split('.').slice(1).join('.') || window.location.host;
+      window.location.href = `${window.location.protocol}//${centralHost}`;
     } else {
       setCurrentPage('register');
     }
@@ -265,7 +268,7 @@ function AppContent() {
         )}
       </main>
 
-      {currentPage !== 'home' && (
+      {/* {currentPage !== 'home' && (
         <footer className="border-t border-slate-200 py-5 text-center text-slate-400 text-xs bg-white">
           {isDomainBased ? (
             <span>
@@ -279,15 +282,27 @@ function AppContent() {
             </span>
           )}
         </footer>
-      )}
+      )} */}
     </div>
   );
 }
 
 export default function App() {
   return (
-    <ToastProvider>
+    <>
       <AppContent />
-    </ToastProvider>
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+    </>
   );
 }

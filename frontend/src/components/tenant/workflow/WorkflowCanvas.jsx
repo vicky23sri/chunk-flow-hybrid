@@ -24,7 +24,7 @@ export default function WorkflowCanvas({
       onDrop={onDropCanvas}
       onMouseMove={onMouseMoveCanvas}
       onMouseUp={onMouseUpCanvas}
-      className="lg:col-span-7 bg-[#fafbfc] p-6 relative flex flex-col justify-between overflow-hidden min-h-[480px] lg:min-h-0 select-none flex-1"
+      className="lg:col-span-6 col-span-12 bg-[#fafbfc] relative flex flex-col justify-between overflow-hidden min-h-[480px] lg:min-h-0 select-none flex-1 border-r border-slate-200/80"
     >
       {/* Grid Background Pattern */}
       <div
@@ -66,13 +66,13 @@ export default function WorkflowCanvas({
           const tgtNode = nodes.find((n) => n.id === conn.targetId);
           if (!srcNode || !tgtNode) return null;
 
-          // Blue dot position (Source output - exact center of blue circle)
-          const x1 = srcNode.x + 224;
-          const y1 = srcNode.y + 65;
+          // Blue dot position: exact center of blue output circle at right edge of node card (w-64 = 256px, h-110 = 55px)
+          const x1 = srcNode.x + 256;
+          const y1 = srcNode.y + 55;
 
-          // Green dot position (Destination input - exact center of green circle)
+          // Green dot position: exact center of green input circle at left edge of node card
           const x2 = tgtNode.x;
-          const y2 = tgtNode.y + 65;
+          const y2 = tgtNode.y + 55;
 
           const dx = Math.abs(x2 - x1) / 2;
 
@@ -108,8 +108,8 @@ export default function WorkflowCanvas({
         })}
       </svg>
 
-      {/* Render Nodes on Canvas */}
-      <div className="relative z-20 flex-1">
+      {/* Render Nodes on Canvas Layer */}
+      <div className="absolute inset-0 z-20 pointer-events-none">
         {nodes.map((node) => (
           <WorkflowNodeCard
             key={node.id}
@@ -123,7 +123,8 @@ export default function WorkflowCanvas({
         ))}
       </div>
 
-      <div className="relative z-10 flex justify-between items-center text-[11px] text-slate-500 font-mono pt-3 border-t border-slate-200/80">
+      {/* Bottom Canvas Footer Bar */}
+      <div className="relative z-10 flex justify-between items-center text-[11px] text-slate-500 font-mono p-4 border-t border-slate-200/80 bg-white/50 backdrop-blur-xs mt-auto">
         <span>Canvas State: {nodes.length} Nodes • {connections.length} Wire Connected</span>
         <span className="text-emerald-600 font-bold">● FastCDC Stream Slicer Ready</span>
       </div>

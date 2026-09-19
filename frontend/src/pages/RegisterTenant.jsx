@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { api, setAuthSession } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { showSuccess, showError } from '../utils/toast';
 import { Building2, UserPlus, ArrowRight, ShieldCheck, Sparkles, Database, Globe, CheckCircle2, Lock, Mail } from 'lucide-react';
 
 export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
-  const { showSuccess, showError } = useToast();
   const [tenantName, setTenantName] = useState('');
   const [subdomain, setSubdomain]     = useState('');
   const [adminEmail, setAdminEmail]   = useState('');

@@ -22,9 +22,10 @@ export default function NodeInspectorPanel({
   nodes,
   connections,
   onRemoveConnection,
+  errors = {},
 }) {
   return (
-    <div className="lg:col-span-3 bg-white p-6 border-l border-slate-200/90 flex flex-col justify-between overflow-y-auto">
+    <div className="lg:col-span-3 col-span-12 bg-white p-4 sm:p-5 border-t lg:border-t-0 border-slate-200/90 flex flex-col justify-between overflow-y-auto">
       <div>
         {/* Header: Node Configuration Title & Close X */}
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
@@ -74,6 +75,7 @@ export default function NodeInspectorPanel({
                 onTestConnection={onTestConnection}
                 isTesting={isTestingConnection}
                 testResult={testResult}
+                errors={errors}
               />
             )}
 
@@ -87,6 +89,7 @@ export default function NodeInspectorPanel({
                 onTestConnection={onTestConnection}
                 isTesting={isTestingConnection}
                 testResult={testResult}
+                errors={errors}
               />
             )}
           </div>
@@ -203,26 +206,26 @@ export default function NodeInspectorPanel({
       </div>
 
       {/* Footer Action Bar */}
-      <div className="pt-4 border-t border-slate-200 space-y-2.5">
+      <div className="pt-4 border-t border-slate-200">
         {selectedNode ? (
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={onTestConnection}
-              disabled={!selectedNodeId || isTestingConnection}
-              className="py-2.5 px-3 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
-            >
-              {isTestingConnection ? (
-                <RefreshCw size={14} className="animate-spin text-blue-600" />
-              ) : (
-                <Zap size={14} className="text-amber-500 fill-amber-500" />
-              )}
-              <span>{isTestingConnection ? 'Testing...' : 'Test Config'}</span>
-            </button>
+          <div className="relative group w-full">
+            {/* Hover Tooltip when Deactivated */}
+            {!selectedNode?.isValid && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-[250px] p-2.5 bg-slate-900 text-white text-[11px] font-medium rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 text-center border border-slate-700/80">
+                <div className="flex items-center gap-1.5 justify-center text-amber-400 font-bold mb-0.5">
+                  <AlertCircle size={13} /> Test Connection Required
+                </div>
+                <span className="text-slate-200 leading-tight block">
+                  Save Config is deactivated. Click <strong>"Test Connection"</strong> in the form above to activate.
+                </span>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+              </div>
+            )}
 
             <button
               onClick={onSaveConfig}
-              disabled={!selectedNodeId}
-              className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-[#f95716] text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+              disabled={!selectedNodeId || !selectedNode?.isValid || isTestingConnection}
+              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 bg-[#f95716] hover:bg-orange-600 text-white"
             >
               <Save size={14} />
               <span>Save Config</span>

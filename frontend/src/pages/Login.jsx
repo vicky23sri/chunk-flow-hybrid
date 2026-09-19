@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, setAuthSession } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { showError } from '../utils/toast';
 import {
   Building2, Crown, Lock, Globe, ArrowRight,
   Eye, EyeOff, ArrowLeft, Database, ShieldCheck,
@@ -9,7 +9,6 @@ import {
 
 // ─── Domain Login (willsparrow.localhost:5173) ───────────────────────────────
 function TenantDomainLogin({ subdomain, onSuccess }) {
-  const { showError } = useToast();
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -193,7 +192,6 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
 
 // ─── Central Login (localhost:5173) — Super Admin ONLY ───────────────────────
 function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initialPassword }) {
-  const { showError } = useToast();
   const [email, setEmail]               = useState(initialEmail || '');
   const [password, setPassword]         = useState(initialPassword || '');
   const [showPassword, setShowPassword] = useState(false);
