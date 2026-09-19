@@ -9,81 +9,93 @@ export default function WorkflowNodeCard({
   onPortClick,
   onDeleteNode,
 }) {
-  let iconStyle = 'text-blue-600 bg-blue-50 border-blue-200';
-  if (node.type === 'destination') iconStyle = 'text-emerald-600 bg-emerald-50 border-emerald-200';
+  const isSource = node.type === 'source';
+  const isPostgres = node.subtype === 'postgres';
 
   return (
     <div
       onMouseDown={(e) => onNodeMouseDown(e, node.id)}
+      onTouchStart={(e) => onNodeMouseDown(e, node.id)}
       style={{ left: `${node.x}px`, top: `${node.y}px` }}
-      className={`absolute w-56 h-[130px] p-3.5 rounded-2xl bg-white border transition-shadow duration-150 cursor-move shadow-xs hover:shadow-md flex flex-col justify-between ${
+      className={`absolute w-64 h-[110px] p-3 rounded-xl bg-white border transition-all duration-150 cursor-move shadow-sm hover:shadow-md flex flex-col justify-between select-none pointer-events-auto ${
         isSelected
-          ? 'border-[#f95716] ring-4 ring-orange-500/10 shadow-md shadow-orange-500/10'
-          : 'border-slate-200/90 hover:border-slate-300'
+          ? 'border-[#f95716] ring-2 ring-orange-500/20 shadow-md z-30'
+          : 'border-slate-200 hover:border-slate-300 z-20'
       }`}
     >
-      {/* 🟢 GREEN DOT: Destination Input Port (Vertically Centered on Left) */}
-      {node.type === 'destination' && (
+      {/* 🟢 GREEN DOT: Destination Input Port (Vertically Centered on Left Edge) */}
+      {!isSource && (
         <div
           onClick={(e) => {
             e.stopPropagation();
             onPortClick(node);
           }}
-          className={`port-dot absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-emerald-500 border-white text-white flex items-center justify-center cursor-pointer shadow-md shadow-emerald-500/30 transition-transform hover:scale-125 z-30 ${
-            connectingSourceId ? 'ring-4 ring-emerald-400/40 animate-bounce' : ''
+          className={`port-dot absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-emerald-500 text-emerald-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-110 transition-transform z-40 ${
+            connectingSourceId ? 'ring-4 ring-emerald-400/50 animate-bounce' : ''
           }`}
-          title="Green Input Dot: Click to complete connection wire"
+          title="Input Port: Click to connect wire here"
         >
-          <div className="w-2 h-2 rounded-full bg-white" />
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
         </div>
       )}
 
-      {/* 🔵 BLUE DOT: Source Output Port (Vertically Centered on Right) */}
-      {node.type === 'source' && (
+      {/* 🔵 BLUE DOT: Source Output Port (Vertically Centered on Right Edge) */}
+      {isSource && (
         <div
           onClick={(e) => {
             e.stopPropagation();
             onPortClick(node);
           }}
-          className={`port-dot absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-blue-600 border-white text-white flex items-center justify-center cursor-pointer shadow-md shadow-blue-500/30 transition-transform hover:scale-125 z-30 ${
-            connectingSourceId === node.id ? 'ring-4 ring-blue-400/40 animate-pulse' : ''
+          className={`port-dot absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-blue-600 text-blue-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-110 transition-transform z-40 ${
+            connectingSourceId === node.id ? 'ring-4 ring-blue-400/50 animate-pulse' : ''
           }`}
-          title="Blue Output Dot: Click to start connection wire"
+          title="Output Port: Click to start wire from here"
         >
-          <div className="w-2 h-2 rounded-full bg-white" />
+          <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
         </div>
       )}
 
-      {/* Header Row */}
-      <div className="flex items-center justify-between mb-2">
-        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center ${iconStyle}`}>
-          {node.subtype === 'postgres' ? <Database size={16} /> : <Cloud size={16} />}
+      {/* Compact Main Content Row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white font-bold shadow-xs ${
+              isPostgres ? 'bg-blue-600' : 'bg-emerald-600'
+            }`}
+          >
+            {isPostgres ? <Database size={16} /> : <Cloud size={16} />}
+          </div>
+
+          <div className="min-w-0">
+            <h4 className="font-bold text-xs text-slate-900 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+              {node.title}
+            </h4>
+            <p className="text-[11px] font-mono text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis mt-0.5">
+              {node.subtitle}
+            </p>
+          </div>
         </div>
 
-        <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full text-slate-700">
+        <span
+          className={`text-[9px] font-mono font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+            isSource
+              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+          }`}
+        >
           {node.type}
         </span>
       </div>
 
-      {/* Title & Subtitle */}
-      <div className="mb-3">
-        <h4 className="font-black text-xs text-slate-900 tracking-tight leading-snug truncate">
-          {node.title}
-        </h4>
-        <div className="text-[11px] font-mono text-slate-500 truncate mt-0.5">
-          {node.subtitle}
-        </div>
-      </div>
-
-      {/* Node Footer: Shows Configured (Green) or Needs Config (Yellow) */}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
+      {/* Footer Status Bar - Compact & High Contrast */}
+      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs mt-1">
         {node.isValid ? (
-          <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
-            <CheckCircle2 size={11} /> Configured
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+            <CheckCircle2 size={11} className="text-emerald-600" /> Configured
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-amber-600 font-bold">
-            <AlertCircle size={11} /> Needs Config
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
+            <AlertCircle size={11} className="text-amber-600" /> Needs Config
           </span>
         )}
 
@@ -92,7 +104,7 @@ export default function WorkflowNodeCard({
             e.stopPropagation();
             onDeleteNode(node.id);
           }}
-          className="delete-btn text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
+          className="delete-btn text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded p-1 transition-colors cursor-pointer"
           title="Remove Node"
         >
           <Trash2 size={12} />

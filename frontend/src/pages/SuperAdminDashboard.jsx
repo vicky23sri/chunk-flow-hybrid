@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { showSuccess, showError } from '../utils/toast';
 import { 
   Crown, Database, Globe, Users, Plus, Building2, ShieldCheck, 
   Terminal, Activity, RefreshCw, AlertCircle, ExternalLink, FolderGit2
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
-  const { showSuccess, showError } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

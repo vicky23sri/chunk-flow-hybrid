@@ -1,11 +1,20 @@
-// LocalStorage Persistence Helper for PostgreSQL & S3 Connection Settings
+import { getActiveSubdomain } from './api';
 
-const PG_CONFIG_KEY = 'chunkflow_saved_pg_config';
-const S3_CONFIG_KEY = 'chunkflow_saved_s3_config';
+// LocalStorage & API Persistence Helper for PostgreSQL & S3 Connection Settings
+const getPgKey = (subdomain) => {
+  const sub = (subdomain || getActiveSubdomain() || 'default').toLowerCase();
+  return `chunkflow_${sub}_saved_pg_config`;
+};
 
-export const getSavedPostgresConfig = () => {
+const getS3Key = (subdomain) => {
+  const sub = (subdomain || getActiveSubdomain() || 'default').toLowerCase();
+  return `chunkflow_${sub}_saved_s3_config`;
+};
+
+export const getSavedPostgresConfig = (subdomain) => {
   try {
-    const raw = localStorage.getItem(PG_CONFIG_KEY);
+    const key = getPgKey(subdomain);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -35,20 +44,31 @@ export const getSavedPostgresConfig = () => {
   };
 };
 
-export const savePostgresConfig = (config) => {
+export const savePostgresConfig = (config, subdomain) => {
   try {
-    const current = getSavedPostgresConfig();
+    const key = getPgKey(subdomain);
+    const current = getSavedPostgresConfig(subdomain);
     const updated = { ...current, ...config };
-    localStorage.setItem(PG_CONFIG_KEY, JSON.stringify(updated));
+    localStorage.setItem(key, JSON.stringify(updated));
+
+    // Async sync to Go backend endpoint
+    const sub = subdomain || getActiveSubdomain() || 'default';
+    fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/tenant-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': sub },
+      body: JSON.stringify({ subdomain: sub, postgres: updated }),
+    }).catch(() => {});
+
     return updated;
   } catch (err) {
     console.warn('Failed to save PostgreSQL config:', err);
   }
 };
 
-export const getSavedS3Config = () => {
+export const getSavedS3Config = (subdomain) => {
   try {
-    const raw = localStorage.getItem(S3_CONFIG_KEY);
+    const key = getS3Key(subdomain);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -76,11 +96,21 @@ export const getSavedS3Config = () => {
   };
 };
 
-export const saveS3Config = (config) => {
+export const saveS3Config = (config, subdomain) => {
   try {
-    const current = getSavedS3Config();
+    const key = getS3Key(subdomain);
+    const current = getSavedS3Config(subdomain);
     const updated = { ...current, ...config };
-    localStorage.setItem(S3_CONFIG_KEY, JSON.stringify(updated));
+    localStorage.setItem(key, JSON.stringify(updated));
+
+    // Async sync to Go backend endpoint
+    const sub = subdomain || getActiveSubdomain() || 'default';
+    fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/tenant-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': sub },
+      body: JSON.stringify({ subdomain: sub, s3: updated }),
+    }).catch(() => {});
+
     return updated;
   } catch (err) {
     console.warn('Failed to save S3 config:', err);

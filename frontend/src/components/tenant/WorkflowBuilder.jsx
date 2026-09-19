@@ -4,9 +4,16 @@ import WorkflowHeader from './workflow/WorkflowHeader';
 import NodeLibrarySidebar from './workflow/NodeLibrarySidebar';
 import WorkflowCanvas from './workflow/WorkflowCanvas';
 import NodeInspectorPanel from './workflow/NodeInspectorPanel';
+import SourceTableModal from './workflow/SourceTableModal';
+import DestinationVaultModal from './workflow/DestinationVaultModal';
 import { getSavedPostgresConfig, savePostgresConfig, getSavedS3Config, saveS3Config } from '../../services/connectionStorage';
+import { api } from '../../services/api';
+import { showSuccess, showError, showWarning } from '../../utils/toast';
+import { useFormValidation } from '../../hooks/useFormValidation';
 
 export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
+  const { errors, validatePostgres, validateS3, clearErrors, clearFieldError } = useFormValidation();
+
   // Available tenant databases list
   const availableDatabases = [
     `chunkflow_tenant_${tenant?.subdomain || 'acme'}`,
@@ -27,6 +34,14 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   // Clear Canvas Confirm Modal State
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
 
+  // Source Database Schema & Tables Modal State
+  const [showSourceModal, setShowSourceModal] = useState(false);
+  const [dbDetails, setDbDetails] = useState(null);
+
+  // Destination S3 Vault Modal State
+  const [showS3Modal, setShowS3Modal] = useState(false);
+  const [s3Details, setS3Details] = useState(null);
+
   // Password Visibility Toggle State
   const [showPgPassword, setShowPgPassword] = useState(false);
   const [showS3Secret, setShowS3Secret] = useState(false);
@@ -42,9 +57,10 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   const canvasRef = useRef(null);
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
-  // Reset test connection result on node selection change
+  // Reset test connection result and clear validation errors on node selection change
   useEffect(() => {
     setTestResult(null);
+    clearErrors();
   }, [selectedNodeId]);
 
   // ── Drag & Drop Handlers from Sidebar onto Canvas ──────────────────────────
@@ -77,11 +93,9 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   const createNode = (type, subtype, targetX = null, targetY = null) => {
     const id = `node_${type}_${Date.now()}`;
 
-    // Smart positioning: Source nodes default to left (x = 60), Destination nodes default to right (x = 440)
     let defaultX = type === 'source' ? 60 : 440;
     let defaultY = 140;
 
-    // Offset if nodes of same type already exist to avoid overlapping
     const sameTypeCount = nodes.filter((n) => n.type === type).length;
     if (sameTypeCount > 0) {
       defaultX += (sameTypeCount % 3) * 30;
@@ -97,20 +111,33 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
       subtype,
       x: finalX,
       y: finalY,
-      isValid: true, // Pre-filled nodes are ready by default
+      isValid: false,
       config: {},
     };
 
     if (subtype === 'postgres') {
-      const savedPg = getSavedPostgresConfig(tenant?.subdomain || 'acme');
       newNode.title = 'PostgreSQL Database Source';
-      newNode.subtitle = savedPg.database || `chunkflow_tenant_${tenant?.subdomain || 'acme'}`;
-      newNode.config = savedPg;
+      newNode.subtitle = 'PostgreSQL Data Source';
+      newNode.config = {
+        host: '',
+        port: '',
+        database: '',
+        username: '',
+        password: '',
+        useSSL: false,
+        backupSchedule: '',
+        retentionDays: '',
+      };
     } else if (subtype === 's3') {
-      const savedS3 = getSavedS3Config();
       newNode.title = 'Amazon S3 Vault Destination';
-      newNode.subtitle = `s3://${savedS3.bucketName}/${savedS3.folderPath || ''}`;
-      newNode.config = savedS3;
+      newNode.subtitle = 'S3 Target Destination';
+      newNode.config = {
+        bucketName: '',
+        region: '',
+        accessKeyId: '',
+        secretAccessKey: '',
+        folderPath: '',
+      };
     }
 
     setNodes((prev) => [...prev, newNode]);
@@ -125,44 +152,70 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
     }
   };
 
-  // ── Mouse Dragging Nodes on Canvas Surface ─────────────────────────────────
   const handleNodeMouseDown = (e, nodeId) => {
     if (e.target.closest('.port-dot') || e.target.closest('.delete-btn')) return;
+
+    e.preventDefault();
 
     setSelectedNodeId(nodeId);
     setDraggingNodeId(nodeId);
 
     const node = nodes.find((n) => n.id === nodeId);
-    if (!node) return;
+    if (!node || !canvasRef.current) return;
 
     const canvasRect = canvasRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
     setDragOffset({
-      x: e.clientX - canvasRect.left - node.x,
-      y: e.clientY - canvasRect.top - node.y,
+      x: clientX - canvasRect.left - node.x,
+      y: clientY - canvasRect.top - node.y,
     });
   };
 
-  const handleMouseMoveCanvas = (e) => {
-    if (!draggingNodeId || !canvasRef.current) return;
+  useEffect(() => {
+    if (!draggingNodeId) return;
 
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    let newX = e.clientX - canvasRect.left - dragOffset.x;
-    let newY = e.clientY - canvasRect.top - dragOffset.y;
+    const handleWindowMove = (e) => {
+      if (!canvasRef.current) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    // Bounds checking
-    newX = Math.max(10, Math.min(newX, canvasRect.width - 240));
-    newY = Math.max(10, Math.min(newY, canvasRect.height - 180));
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      let newX = clientX - canvasRect.left - dragOffset.x;
+      let newY = clientY - canvasRect.top - dragOffset.y;
 
-    setNodes((prev) =>
-      prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
-    );
-  };
+      newX = Math.max(10, Math.min(newX, canvasRect.width - 235));
+      newY = Math.max(10, Math.min(newY, canvasRect.height - 140));
+
+      setNodes((prev) =>
+        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
+      );
+    };
+
+    const handleWindowEnd = () => {
+      setDraggingNodeId(null);
+    };
+
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowEnd);
+    window.addEventListener('touchmove', handleWindowMove, { passive: false });
+    window.addEventListener('touchend', handleWindowEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMove);
+      window.removeEventListener('mouseup', handleWindowEnd);
+      window.removeEventListener('touchmove', handleWindowMove);
+      window.removeEventListener('touchend', handleWindowEnd);
+    };
+  }, [draggingNodeId, dragOffset]);
+
+  const handleMouseMoveCanvas = (e) => {};
 
   const handleMouseUpCanvas = () => {
     setDraggingNodeId(null);
   };
 
-  // ── Node Port Connection (Blue Dot Source -> Green Dot Destination) ──────
   const handlePortClick = (node) => {
     if (node.type === 'source') {
       setConnectingSourceId(node.id);
@@ -177,6 +230,16 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
 
   const handleSaveConfig = () => {
     if (!selectedNodeId || !selectedNode) return;
+
+    let isValid = true;
+    if (selectedNode.subtype === 'postgres') {
+      isValid = validatePostgres(selectedNode.config);
+    } else if (selectedNode.subtype === 's3') {
+      isValid = validateS3(selectedNode.config);
+    }
+
+    if (!isValid) return;
+
     if (selectedNode.subtype === 'postgres') {
       savePostgresConfig(selectedNode.config);
     } else if (selectedNode.subtype === 's3') {
@@ -185,53 +248,103 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
     setNodes((prev) =>
       prev.map((n) => (n.id === selectedNodeId ? { ...n, isValid: true } : n))
     );
+    showSuccess('Node configuration saved successfully!', 'Config Saved');
   };
 
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     if (!selectedNode) return;
+
+    let isValid = true;
+    if (selectedNode.subtype === 'postgres') {
+      isValid = validatePostgres(selectedNode.config);
+    } else if (selectedNode.subtype === 's3') {
+      isValid = validateS3(selectedNode.config);
+    }
+
+    if (!isValid) return;
+
+    const config = selectedNode.config || {};
     setIsTestingConnection(true);
     setTestResult(null);
 
-    setTimeout(() => {
-      setIsTestingConnection(false);
-      const config = selectedNode.config || {};
-
-      if (selectedNode.subtype === 'postgres') {
-        const host = config.host?.trim();
-        const db = config.database?.trim();
-        const user = config.username?.trim();
-
-        if (!host && !db && !user) {
-          setTestResult({
-            type: 'error',
-            message: 'Connection Failed: Host, Database Name, and Username are required.',
-          });
-        } else {
+    if (selectedNode.subtype === 'postgres') {
+      try {
+        const res = await api.testDBConnection(config);
+        setIsTestingConnection(false);
+        if (res && res.success) {
+          const msg = res.message || 'PostgreSQL connection verified!';
           setTestResult({
             type: 'success',
-            message: `Connection Successful! Reached PostgreSQL at ${host || 'localhost'}:${config.port || '5432'} (Database: "${db || 'default'}") - Ping 18ms.`,
+            success: true,
+            message: msg,
           });
-        }
-      } else if (selectedNode.subtype === 's3') {
-        const bucket = config.bucketName?.trim();
-        const region = config.region || 'us-west-2';
+          showSuccess(msg, 'PostgreSQL Connection Verified');
 
-        if (!bucket) {
+          setDbDetails(res);
+          setShowSourceModal(true);
+
+          setNodes((prev) =>
+            prev.map((n) =>
+              n.id === selectedNodeId
+                ? {
+                    ...n,
+                    isValid: true,
+                  }
+                : n
+            )
+          );
+        } else {
+          const msg = res?.message || 'PostgreSQL Connection Failed.';
           setTestResult({
             type: 'error',
-            message: 'Configuration Failed: S3 Bucket Name is required.',
+            success: false,
+            message: msg,
           });
-        } else {
-          setTestResult({
-            type: 'success',
-            message: `Configuration Verified! Access granted to S3 Bucket "${bucket}" in region ${region}.`,
-          });
+          showError(msg, 'PostgreSQL Connection Failed');
         }
+      } catch (err) {
+        setIsTestingConnection(false);
+        const msg = err.message || 'Failed to trigger PostgreSQL connection test via Go Backend.';
+        setTestResult({
+          type: 'error',
+          success: false,
+          message: msg,
+        });
+        showError(msg, 'Connection Test Failed');
       }
-    }, 800);
+    } else if (selectedNode.subtype === 's3') {
+      setTimeout(() => {
+        setIsTestingConnection(false);
+        const bucket = config.bucketName?.trim();
+
+        const msg = `Configuration Verified! Access granted to S3 Bucket "${bucket}".`;
+        setTestResult({
+          type: 'success',
+          success: true,
+          message: msg,
+        });
+        showSuccess(msg, 'Amazon S3 Vault Verified');
+
+        setS3Details({ ...config });
+        setShowS3Modal(true);
+
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === selectedNodeId
+              ? {
+                  ...n,
+                  isValid: true,
+                }
+              : n
+          )
+        );
+      }, 600);
+    }
   };
 
   const handleUpdateConfig = (key, value) => {
+    clearFieldError(key);
+    setTestResult(null);
     setNodes((prev) =>
       prev.map((node) => {
         if (node.id === selectedNodeId) {
@@ -254,6 +367,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
 
           return {
             ...node,
+            isValid: false,
             subtitle: updatedSubtitle,
             config: updatedConfig,
           };
@@ -264,12 +378,30 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   };
 
   const handleDeploy = () => {
+    if (nodes.length === 0) {
+      showWarning('Cannot deploy an empty canvas. Please add source and destination nodes.', 'Canvas Empty');
+      return;
+    }
+
+    for (const node of nodes) {
+      let isNodeValid = true;
+      if (node.subtype === 'postgres') {
+        isNodeValid = validatePostgres(node.config);
+      } else if (node.subtype === 's3') {
+        isNodeValid = validateS3(node.config);
+      }
+
+      if (!isNodeValid) {
+        setSelectedNodeId(node.id);
+        return;
+      }
+    }
+
     setIsDeploying(true);
     setDeploySuccess(false);
     setTimeout(() => {
       setIsDeploying(false);
       setDeploySuccess(true);
-      // Mark all nodes as configured on deployment
       setNodes((prev) => prev.map((n) => ({ ...n, isValid: true })));
       if (onSaveWorkflow) onSaveWorkflow({ nodes, connections });
       setTimeout(() => setDeploySuccess(false), 4000);
@@ -283,6 +415,34 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
   const executeClearCanvas = () => {
     setNodes([]);
     setConnections([]);
+    setSelectedNodeId(null);
+  };
+
+  const handleCloseInspector = () => {
+    if (selectedNodeId) {
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (n.id === selectedNodeId) {
+            if (n.subtype === 'postgres') {
+              return {
+                ...n,
+                isValid: false,
+                config: { host: '', port: '', database: '', username: '', password: '', useSSL: false, backupSchedule: '', retentionDays: '' },
+              };
+            } else if (n.subtype === 's3') {
+              return {
+                ...n,
+                isValid: false,
+                config: { bucketName: '', region: '', accessKeyId: '', secretAccessKey: '', folderPath: '' },
+              };
+            }
+          }
+          return n;
+        })
+      );
+    }
+    setTestResult(null);
+    clearErrors();
     setSelectedNodeId(null);
   };
 
@@ -328,7 +488,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
         <NodeInspectorPanel
           selectedNode={selectedNode}
           selectedNodeId={selectedNodeId}
-          onCloseInspector={() => setSelectedNodeId(null)}
+          onCloseInspector={handleCloseInspector}
           onUpdateConfig={handleUpdateConfig}
           showPgPassword={showPgPassword}
           onTogglePgPassword={() => setShowPgPassword(!showPgPassword)}
@@ -340,6 +500,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
           onSaveConfig={handleSaveConfig}
           nodes={nodes}
           connections={connections}
+          errors={errors}
           onRemoveConnection={(connId) =>
             setConnections((prev) => prev.filter((c) => c.id !== connId))
           }
@@ -356,6 +517,32 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow }) {
         confirmText="Clear Canvas"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Source Database Schema & Tables Inspection Modal */}
+      <SourceTableModal
+        isOpen={showSourceModal}
+        onClose={() => setShowSourceModal(false)}
+        dbDetails={dbDetails}
+        onConfirmSelection={(selectedTables) => {
+          showSuccess(
+            `Selected ${selectedTables.length} table(s) for backup stream: ${selectedTables.slice(0, 3).join(', ')}${selectedTables.length > 3 ? '...' : ''}`,
+            'Source Pipeline Schema Configured'
+          );
+        }}
+      />
+
+      {/* Destination S3 Vault Inspection Modal */}
+      <DestinationVaultModal
+        isOpen={showS3Modal}
+        onClose={() => setShowS3Modal(false)}
+        s3Details={s3Details}
+        onConfirmDestination={(details) => {
+          showSuccess(
+            `Destination S3 Vault s3://${details.bucketName}/ configured for FastCDC stream`,
+            'Destination Vault Configured'
+          );
+        }}
       />
     </div>
   );

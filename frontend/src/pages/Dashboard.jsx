@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { useToast } from '../context/ToastContext';
+import { showSuccess, showError } from '../utils/toast';
 import { 
   Building2, FolderGit2, HardDrive, ShieldCheck, Plus, Trash2, Lock, 
   RefreshCw, FileText, CheckCircle2, Activity, Database, ExternalLink, 
@@ -16,7 +16,6 @@ import SnapshotExplorer from '../components/tenant/SnapshotExplorer';
 import ConnectionSettingsModal from '../components/tenant/ConnectionSettingsModal';
 
 export default function Dashboard({ user, tenant, onTenantChange }) {
-  const { showSuccess, showError } = useToast();
   const [projects, setProjects] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [bucketPrefix, setBucketPrefix] = useState('');
@@ -303,7 +302,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
         <div className="p-2 sm:p-3 border-t border-slate-100 bg-slate-50/60 space-y-2">
           {!isSidebarCollapsed ? (
             <>
-              <button
+              {/* <button
                 onClick={copyConnectionDSN}
                 className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-orange-500/50 text-slate-700 font-mono text-[11px] font-bold flex items-center justify-between cursor-pointer transition-all shadow-xs"
               >
@@ -313,7 +312,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
                 <span className={`text-[10px] font-bold ${copiedDSN ? 'text-emerald-600' : 'text-[#f95716]'}`}>
                   {copiedDSN ? 'Copied!' : 'Copy DSN'}
                 </span>
-              </button>
+              </button> */}
 
               <button
                 onClick={() => setShowSettingsModal(true)}
@@ -325,13 +324,13 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
             </>
           ) : (
             <div className="flex flex-col gap-2 items-center">
-              <button
+              {/* <button
                 onClick={copyConnectionDSN}
                 className="p-2 rounded-xl bg-white border border-slate-200 hover:border-orange-500 text-slate-700 transition-all cursor-pointer shadow-xs"
                 title="Copy Database DSN"
               >
                 <Lock size={16} className="text-[#f95716]" />
-              </button>
+              </button> */}
 
               <button
                 onClick={() => setShowSettingsModal(true)}
@@ -374,14 +373,11 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">
                   {tenant?.name || 'Tenant Workspace Dashboard'}
                 </h1>
-                <p className="text-slate-500 text-xs mt-1.5 font-normal">
-                  Dedicated PostgreSQL database <code className="font-mono text-[#f95716] font-bold">chunkflow_tenant_{tenant?.subdomain}</code> with FastCDC variable stream slicing.
-                </p>
 
-                <div className="text-xs text-slate-500 font-normal flex gap-6 flex-wrap mt-3 font-mono">
+                {/* <div className="text-xs text-slate-500 font-normal flex gap-6 flex-wrap mt-3 font-mono">
                   <span>Target DB: <code className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200 font-bold">chunkflow_tenant_{tenant?.subdomain}</code></span>
                   <span>Tenant UUID: <code className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{tenant?.id}</code></span>
-                </div>
+                </div> */}
               </div>
 
               <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-xs space-y-2 relative z-10 shrink-0 w-full sm:w-auto min-w-[280px] shadow-xs">

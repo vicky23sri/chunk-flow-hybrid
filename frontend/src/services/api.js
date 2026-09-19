@@ -1,13 +1,20 @@
+const LARAVEL_API_BASE = import.meta.env.VITE_LARAVEL_API_URL || 'http://localhost:8000/api/v1';
+const GO_API_BASE = import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1';
+
 // ─── Base URL resolution ───────────────────────────────────────────────────
-// When visiting via willsparrow.localhost:5173, API calls go to willsparrow.localhost:8000
-// When visiting via localhost:5173,             API calls go to localhost:8000
+// Dynamically builds tenant subdomain API URL from VITE_LARAVEL_API_URL
 function getApiBaseUrl() {
   const domainSub = getDomainBasedSubdomain();
   if (domainSub) {
-    // Domain-based: route to the tenant's domain on port 8000 (Laravel)
-    return `http://${domainSub}.localhost:8000/api/v1`;
+    try {
+      const url = new URL(LARAVEL_API_BASE);
+      const portStr = url.port ? `:${url.port}` : '';
+      return `${url.protocol}//${domainSub}.${url.hostname}${portStr}${url.pathname}`;
+    } catch (e) {
+      return LARAVEL_API_BASE;
+    }
   }
-  return 'http://localhost:8000/api/v1';
+  return LARAVEL_API_BASE;
 }
 
 function extractErrorMessage(response, data) {
@@ -143,7 +150,7 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-// ─── Central request (always hits localhost:8000) ─────────────────────────
+// ─── Central request (always hits central Laravel backend) ─────────────────
 async function centralRequest(endpoint, options = {}) {
   const token = getToken();
 
@@ -158,13 +165,13 @@ async function centralRequest(endpoint, options = {}) {
 
   let response, data;
   try {
-    response = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
+    response = await fetch(`${LARAVEL_API_BASE}${endpoint}`, {
       ...options,
       headers,
     });
     data = await response.json().catch(() => ({}));
   } catch (netErr) {
-    throw new Error('Network Error: Unable to connect to central backend server at http://localhost:8000');
+    throw new Error('Network Error: Unable to connect to central backend server at ' + LARAVEL_API_BASE);
   }
 
   if (!response.ok) {
@@ -221,4 +228,29 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(docData),
   }),
+
+  // ─── Go Backend PostgreSQL Connection Test API ────────────────────────────
+  testDBConnection: async (config) => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/test-db-connection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          message: data.message || `HTTP ${res.status}: Backend error.`,
+        };
+      }
+      return data;
+    } catch (err) {
+      // Fallback: If Go server is not running, return clear notice
+      return {
+        success: false,
+        message: `Network Error: Unable to reach Go Backend at ${GO_API_BASE}. Please ensure \`go run cmd/main.go\` is running in go_backend directory.`,
+      };
+    }
+  },
 };

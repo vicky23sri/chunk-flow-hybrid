@@ -23,10 +23,13 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\TenantHeaderMiddleware::class,
             \Illuminate\Auth\Middleware\Authenticate::class,
         ]);
+        $middleware->redirectGuestsTo(fn (Request $request) => response()->json(['message' => 'Unauthenticated.'], 401));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson() || true,
         );
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        });
     })->create();
-

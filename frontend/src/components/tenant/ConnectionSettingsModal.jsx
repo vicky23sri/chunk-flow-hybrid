@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Cloud, Plug, Save, X, ShieldCheck, RefreshCw } from 'lucide-react';
 import { getSavedPostgresConfig, savePostgresConfig, getSavedS3Config, saveS3Config } from '../../services/connectionStorage';
+import { useFormValidation } from '../../hooks/useFormValidation';
 import PostgresConfigForm from './workflow/PostgresConfigForm';
 import S3ConfigForm from './workflow/S3ConfigForm';
 
@@ -14,6 +15,9 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
+  const pgVal = useFormValidation();
+  const s3Val = useFormValidation();
+
   useEffect(() => {
     const pg = getSavedPostgresConfig(tenant?.subdomain || 'acme');
     const s3 = getSavedS3Config();
@@ -23,13 +27,22 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
 
   const handlePgChange = (key, value) => {
     setPgConfig((prev) => ({ ...prev, [key]: value }));
+    pgVal.clearFieldError(key);
+    setTestResult(null);
   };
 
   const handleS3Change = (key, value) => {
     setS3Config((prev) => ({ ...prev, [key]: value }));
+    s3Val.clearFieldError(key);
+    setTestResult(null);
   };
 
   const handleTestConnection = () => {
+    const isPgOk = pgVal.validatePostgres(pgConfig);
+    const isS3Ok = s3Val.validateS3(s3Config);
+
+    if (!isPgOk || !isS3Ok) return;
+
     setTesting(true);
     setTestResult(null);
 
@@ -37,13 +50,19 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
       setTesting(false);
       setTestResult({
         success: true,
-        msg: `Connection verified! PostgreSQL '${pgConfig.database}' on ${pgConfig.host}:${pgConfig.port} and AWS S3 bucket '${s3Config.bucketName}' are active.`,
+        msg: `Disclaimer: Connection verified! PostgreSQL '${pgConfig.database}' on ${pgConfig.host}:${pgConfig.port} and AWS S3 bucket '${s3Config.bucketName}' are active. "Save Credentials & Sync" is now activated.`,
       });
     }, 800);
   };
 
   const handleSave = (e) => {
     e.preventDefault();
+    if (!testResult?.success) return;
+    const isPgOk = pgVal.validatePostgres(pgConfig);
+    const isS3Ok = s3Val.validateS3(s3Config);
+
+    if (!isPgOk || !isS3Ok) return;
+
     savePostgresConfig(pgConfig);
     saveS3Config(s3Config);
 
@@ -92,6 +111,7 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
                 onChange={handlePgChange}
                 showPassword={showPgPassword}
                 onTogglePassword={() => setShowPgPassword(!showPgPassword)}
+                errors={pgVal.errors}
               />
             </div>
 
@@ -106,6 +126,7 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
                 onChange={handleS3Change}
                 showSecret={showS3Secret}
                 onToggleSecret={() => setShowS3Secret(!showS3Secret)}
+                errors={s3Val.errors}
               />
             </div>
 
@@ -139,13 +160,29 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[#f95716] hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-2"
-              >
-                <Save size={14} />
-                <span>Save Credentials & Sync</span>
-              </button>
+              
+              <div className="relative group">
+                {!testResult?.success && (
+                  <div className="absolute bottom-full right-0 mb-2.5 w-[250px] p-2.5 bg-slate-900 text-white text-[11px] font-medium rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 text-center border border-slate-700/80">
+                    <div className="flex items-center gap-1.5 justify-center text-amber-400 font-bold mb-0.5">
+                      <ShieldCheck size={13} /> Disclaimer & Requirement
+                    </div>
+                    <span className="text-slate-200 leading-tight block">
+                      Save is deactivated. Click <strong>"Test Both Connections"</strong> first to verify configurations.
+                    </span>
+                    <div className="absolute top-full right-8 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!testResult?.success}
+                  className="px-6 py-2.5 rounded-xl bg-[#f95716] hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 shadow-none"
+                >
+                  <Save size={14} />
+                  <span>Save Credentials & Sync</span>
+                </button>
+              </div>
             </div>
           </div>
 
