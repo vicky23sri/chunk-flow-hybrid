@@ -1,60 +1,61 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"chunkflow-backend/internal/handlers"
-	"chunkflow-backend/internal/middleware"
+	"chunkflow-backend/internal/config"
+	"chunkflow-backend/internal/routes"
 
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Println("Notice: No .env file found — falling back to system environment variables")
+	// 1. Load centralized configuration
+	cfg := config.LoadConfig()
+
+	// 2. Setup Gin Router & Register Routes
+	router := routes.SetupRouter(cfg)
+
+	// 3. Configure HTTP Server
+	serverAddr := fmt.Sprintf(":%s", cfg.Port)
+	srv := &http.Server{
+		Addr:         serverAddr,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	// Set Gin mode
-	gin.SetMode(gin.ReleaseMode)
-	if os.Getenv("GIN_MODE") == "debug" {
-		gin.SetMode(gin.DebugMode)
+	// 4. Start Server in background goroutine
+	go func() {
+		log.Printf("🚀 ChunkFlow Go Backend running on http://localhost:%s (env: %s)\n", cfg.Port, cfg.AppEnv)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server failed to start: %v\n", err)
+		}
+	}()
+
+	// 5. Listen for OS Signals for Graceful Shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down ChunkFlow Go Backend server...")
+
+	// 6. Shutdown context with 5-second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v\n", err)
 	}
 
-	router := gin.Default()
-
-	// ── Global Middleware ─────────────────────────────────────────────────────
-	router.Use(middleware.CORS())
-
-	// ── API Routes ────────────────────────────────────────────────────────────
-	api := router.Group("/api/v1")
-	{
-		// Test a live PostgreSQL connection (returns latency + table stats)
-		api.POST("/test-db-connection", handlers.TestDBConnection)
-
-		// Save node config (Postgres or S3) to the tenant's own database
-		api.POST("/tenant-config", handlers.SaveTenantConfig)
-
-		// Read back saved node configs from the tenant's database
-		api.GET("/tenant-config", handlers.GetTenantConfig)
-
-		// Deploy workflow pipeline and map source & destination DB IDs in workflow_deployments
-		api.POST("/workflow/deploy", handlers.DeployWorkflow)
-
-		// Get all deployed workflows for tenant
-		api.GET("/workflows", handlers.GetWorkflows)
-	}
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 ChunkFlow Go Backend running on http://localhost:%s\n", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
+	log.Println("Server exiting gracefully.")
 }
