@@ -3,41 +3,22 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"os"
+
+	"chunkflow-backend/internal/config"
 
 	_ "github.com/lib/pq"
 )
 
 // OpenTenantDB opens a PostgreSQL connection to the given tenant's dedicated database.
 // Database name is derived as: chunkflow_tenant_{subdomain}
-// Connection parameters are read strictly from environment variables.
+// Connection parameters are read from centralized configuration.
 func OpenTenantDB(subdomain string) (*sql.DB, string, error) {
 	tenantDB := fmt.Sprintf("chunkflow_tenant_%s", subdomain)
-
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5432"
-	}
-	user := os.Getenv("DB_USERNAME")
-	if user == "" {
-		user = os.Getenv("DB_USER")
-	}
-	if user == "" {
-		user = "postgres"
-	}
-	pass := os.Getenv("DB_PASSWORD")
-	sslMode := os.Getenv("DB_SSLMODE")
-	if sslMode == "" {
-		sslMode = "disable"
-	}
+	cfg := config.LoadConfig()
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s connect_timeout=5",
-		host, port, user, pass, tenantDB, sslMode,
+		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, tenantDB, cfg.DBSSLMode,
 	)
 
 	conn, err := sql.Open("postgres", connStr)
