@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"chunkflow-backend/internal/crypto"
 	"chunkflow-backend/internal/db"
 
 	"github.com/gin-gonic/gin"
@@ -218,7 +219,7 @@ func GetWorkflows(c *gin.Context) {
 			item.SourceConfigID = srcID
 			item.DestinationConfigID = destID
 			if len(nodesRaw) > 0 {
-				item.NodesData = json.RawMessage(nodesRaw)
+				item.NodesData = json.RawMessage(sanitizeNodesData(nodesRaw))
 			}
 			if len(connsRaw) > 0 {
 				item.ConnectionsData = json.RawMessage(connsRaw)
@@ -253,4 +254,35 @@ func ensureWorkflowTables(ctx context.Context, conn sqlConn) {
 			updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)
 	`)
+}
+
+// sanitizeNodesData decrypts any encrypted string fields in nodes_data JSON
+func sanitizeNodesData(nodesRaw []byte) []byte {
+	if len(nodesRaw) == 0 {
+		return nodesRaw
+	}
+	var nodes []map[string]interface{}
+	if err := json.Unmarshal(nodesRaw, &nodes); err != nil {
+		return nodesRaw
+	}
+
+	for _, node := range nodes {
+		if sub, ok := node["subtitle"].(string); ok {
+			node["subtitle"], _ = crypto.Decrypt(sub)
+		}
+		if cfg, ok := node["config"].(map[string]interface{}); ok {
+			for k, v := range cfg {
+				if strVal, isStr := v.(string); isStr {
+					decVal, _ := crypto.Decrypt(strVal)
+					cfg[k] = decVal
+				}
+			}
+		}
+	}
+
+	out, err := json.Marshal(nodes)
+	if err != nil {
+		return nodesRaw
+	}
+	return out
 }

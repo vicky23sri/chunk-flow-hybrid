@@ -207,7 +207,7 @@ function AppContent() {
 
   // ─── Render ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className={`flex flex-col bg-slate-50 ${currentPage === 'dashboard' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <Header
         user={user}
         tenant={tenant}
@@ -220,7 +220,7 @@ function AppContent() {
         onTenantChange={handleTenantChange}
       />
 
-      <main className="flex-1">
+      <main className={`flex-1 ${currentPage === 'dashboard' ? 'h-[calc(100vh-65px)] overflow-hidden flex flex-col' : ''}`}>
         {/* Landing page — shown on home for central or tenant domain */}
         {currentPage === 'home' && (
           <LandingPage
