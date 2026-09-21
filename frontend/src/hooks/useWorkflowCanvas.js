@@ -62,22 +62,22 @@ export function useWorkflowCanvas(tenant) {
       x: finalX,
       y: finalY,
       isValid: false,
-      title: subtype === 'postgres' ? 'PostgreSQL Database Source' : 'Amazon S3 Vault Destination',
-      subtitle: subtype === 'postgres' ? 'PostgreSQL Data Source' : 'S3 Target Destination',
+      title: subtype === 'postgres' ? 'Database Source' : 'Amazon S3 Vault Destination',
+      subtitle: subtype === 'postgres' ? 'Enter database details...' : 'Enter S3 vault details...',
       config: subtype === 'postgres' ? {
-        name: 'PostgreSQL Data Source',
+        name: '',
         host: '',
-        port: '5432',
-        database: tenant?.subdomain ? `chunkflow_tenant_${tenant.subdomain}` : '',
+        port: '',
+        database: '',
         username: '',
         password: '',
         useSSL: false,
         backupSchedule: '',
         retentionDays: '',
       } : {
-        name: 'Amazon S3 Vault',
+        name: '',
         bucketName: '',
-        region: 'ap-south-1',
+        region: '',
         accessKeyId: '',
         secretAccessKey: '',
         folderPath: '',
@@ -177,7 +177,7 @@ export function useWorkflowCanvas(tenant) {
           let updatedTitle = node.title;
 
           if (key === 'name') {
-            updatedTitle = value || (node.subtype === 'postgres' ? 'PostgreSQL Database Source' : 'Amazon S3 Vault Destination');
+            updatedTitle = value || (node.subtype === 'postgres' ? 'Database Source' : 'Amazon S3 Vault Destination');
           }
 
           if (node.subtype === 'postgres') {

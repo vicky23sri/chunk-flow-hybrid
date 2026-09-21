@@ -182,6 +182,10 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 		return nil
 	}
 
+	reqID := str("id")
+	if reqID == "" {
+		reqID = str("source_config_id")
+	}
 	host := str("host")
 	dbName := str("database")
 	if dbName == "" {
@@ -194,9 +198,6 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 	password := str("password")
 	port := str("port")
 	name := str("name")
-	if name == "" {
-		name = "PostgreSQL Data Source"
-	}
 	if port == "" {
 		port = "5432"
 	}
@@ -204,8 +205,18 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 	backupSchedule := str("backupSchedule")
 	retentionDays := intPtr("retentionDays")
 
+	// Ensure input fields are decrypted first BEFORE checking existing records!
+	host, _ = crypto.Decrypt(host)
+	port, _ = crypto.Decrypt(port)
+	dbName, _ = crypto.Decrypt(dbName)
+	username, _ = crypto.Decrypt(username)
+	password, _ = crypto.Decrypt(password)
+
 	if host == "" || dbName == "" || username == "" || password == "" {
 		return "", nil // skip — incomplete config
+	}
+	if name == "" {
+		name = "Database Source"
 	}
 
 	// Idempotent: add unique constraint if missing
@@ -220,29 +231,31 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 		END $$
 	`)
 
-	// Check if record already exists by comparing decrypted database_name
+	// Check if record already exists by comparing decrypted database_name, host+db, or ID
 	var existingID string
-	rows, errQ := conn.QueryContext(ctx, `SELECT id, database_name FROM source_configurations`)
+	rows, errQ := conn.QueryContext(ctx, `SELECT id, host, database_name FROM source_configurations ORDER BY updated_at DESC`)
 	if errQ == nil {
+		var firstID string
 		for rows.Next() {
-			var rID, encDB string
-			if e := rows.Scan(&rID, &encDB); e == nil {
+			var rID, encH, encDB string
+			if e := rows.Scan(&rID, &encH, &encDB); e == nil {
+				if firstID == "" {
+					firstID = rID
+				}
+				decH, _ := crypto.Decrypt(encH)
 				decDB, _ := crypto.Decrypt(encDB)
-				if decDB == dbName {
+				if (reqID != "" && rID == reqID) || (decDB == dbName) || (decH == host && decDB == dbName) {
 					existingID = rID
 					break
 				}
 			}
 		}
 		rows.Close()
-	}
 
-	// Ensure input fields are decrypted first if they were passed in encrypted format
-	host, _ = crypto.Decrypt(host)
-	port, _ = crypto.Decrypt(port)
-	dbName, _ = crypto.Decrypt(dbName)
-	username, _ = crypto.Decrypt(username)
-	password, _ = crypto.Decrypt(password)
+		if existingID == "" && firstID != "" {
+			existingID = firstID
+		}
+	}
 
 	// Encrypt sensitive fields (host, port, database_name, username, password)
 	encHost, _ := crypto.Encrypt(host)
@@ -261,14 +274,20 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 			WHERE id=$10
 		`, name, encHost, encPort, encDBName, encUsername, encPassword, useSSL,
 			db.NullableString(backupSchedule), retentionDays, existingID)
+		logger.WriteTenantConfigDetailLog("UPDATE", sub, "PostgreSQL Source", existingID, fmt.Sprintf("HOST=%s DB=%s", host, dbName))
+		// Clean up any stale duplicate source config records
+		_, _ = conn.ExecContext(ctx, `DELETE FROM source_configurations WHERE id != $1`, existingID)
 	} else {
-		_, execErr = conn.ExecContext(ctx, `
+		var newID string
+		execErr = conn.QueryRowContext(ctx, `
 			INSERT INTO source_configurations
 				(name, host, port, database_name, username, password, use_ssl,
 				 backup_schedule, retention_days, is_verified, last_tested_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,NOW(),NOW())
+			RETURNING id
 		`, name, encHost, encPort, encDBName, encUsername, encPassword, useSSL,
-			db.NullableString(backupSchedule), retentionDays)
+			db.NullableString(backupSchedule), retentionDays).Scan(&newID)
+		logger.WriteTenantConfigDetailLog("INSERT", sub, "PostgreSQL Source", newID, fmt.Sprintf("HOST=%s DB=%s", host, dbName))
 	}
 
 	if execErr != nil {
@@ -282,6 +301,10 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 func upsertDestinationConfig(ctx context.Context, conn sqlConn, sub string, data map[string]interface{}) (string, error) {
 	str := func(k string) string { v, _ := data[k].(string); return v }
 
+	reqID := str("id")
+	if reqID == "" {
+		reqID = str("destination_config_id")
+	}
 	bucket := str("bucketName")
 	region := str("region")
 	accessKey := str("accessKeyId")
@@ -290,6 +313,13 @@ func upsertDestinationConfig(ctx context.Context, conn sqlConn, sub string, data
 	encryption := str("encryption")
 	storageClass := str("storageClass")
 	name := str("name")
+
+	// Ensure input fields are decrypted first BEFORE checking existing records!
+	bucket, _ = crypto.Decrypt(bucket)
+	accessKey, _ = crypto.Decrypt(accessKey)
+	secret, _ = crypto.Decrypt(secret)
+	folder, _ = crypto.Decrypt(folder)
+
 	if name == "" {
 		name = "Amazon S3 Vault"
 	}
@@ -304,28 +334,30 @@ func upsertDestinationConfig(ctx context.Context, conn sqlConn, sub string, data
 		return "", nil // skip — incomplete config
 	}
 
-	// Check if record already exists by comparing decrypted bucket_name
+	// Check if record already exists by comparing decrypted bucket_name or ID
 	var existingID string
-	dRows, errDQ := conn.QueryContext(ctx, `SELECT id, bucket_name FROM destination_configurations`)
+	dRows, errDQ := conn.QueryContext(ctx, `SELECT id, bucket_name FROM destination_configurations ORDER BY updated_at DESC`)
 	if errDQ == nil {
+		var firstID string
 		for dRows.Next() {
 			var rID, encBkt string
 			if e := dRows.Scan(&rID, &encBkt); e == nil {
+				if firstID == "" {
+					firstID = rID
+				}
 				decBkt, _ := crypto.Decrypt(encBkt)
-				if decBkt == bucket {
+				if (reqID != "" && rID == reqID) || (decBkt == bucket) {
 					existingID = rID
 					break
 				}
 			}
 		}
 		dRows.Close()
-	}
 
-	// Ensure input fields are decrypted first if they were passed in encrypted format
-	bucket, _ = crypto.Decrypt(bucket)
-	accessKey, _ = crypto.Decrypt(accessKey)
-	secret, _ = crypto.Decrypt(secret)
-	folder, _ = crypto.Decrypt(folder)
+		if existingID == "" && firstID != "" {
+			existingID = firstID
+		}
+	}
 
 	// Encrypt sensitive S3 credentials (bucket_name, access_key_id, secret_access_key, folder_path)
 	encBucket, _ := crypto.Encrypt(bucket)
@@ -343,14 +375,20 @@ func upsertDestinationConfig(ctx context.Context, conn sqlConn, sub string, data
 			WHERE id=$9
 		`, name, encBucket, region, encAccessKey, encSecret,
 			db.NullableString(encFolder), encryption, storageClass, existingID)
+		logger.WriteTenantConfigDetailLog("UPDATE", sub, "S3 Destination", existingID, fmt.Sprintf("BUCKET=%s REGION=%s", bucket, region))
+		// Clean up any stale duplicate destination config records
+		_, _ = conn.ExecContext(ctx, `DELETE FROM destination_configurations WHERE id != $1`, existingID)
 	} else {
-		_, execErr = conn.ExecContext(ctx, `
+		var newID string
+		execErr = conn.QueryRowContext(ctx, `
 			INSERT INTO destination_configurations
 				(name, bucket_name, region, access_key_id, secret_access_key,
 				 folder_path, encryption, storage_class, is_verified, last_tested_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,NOW(),NOW())
+			RETURNING id
 		`, name, encBucket, region, encAccessKey, encSecret,
-			db.NullableString(encFolder), encryption, storageClass)
+			db.NullableString(encFolder), encryption, storageClass).Scan(&newID)
+		logger.WriteTenantConfigDetailLog("INSERT", sub, "S3 Destination", newID, fmt.Sprintf("BUCKET=%s REGION=%s", bucket, region))
 	}
 
 	if execErr != nil {

@@ -143,62 +143,11 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
         }
       }
 
-      // 2. If initialWorkflow is null, construct a clean default canvas for a NEW workflow
-      try {
-        const cfgRes = await api.getTenantConfig();
-        if (!isSubscribed) return;
-
-        const pgConfig = cfgRes?.postgres?.[0] || {};
-        const s3Config = cfgRes?.s3?.[0] || {};
-
-        const pgId = `node_source_${Date.now()}`;
-        const s3Id = `node_destination_${Date.now() + 1}`;
-
-        const defaultPgNode = {
-          id: pgId,
-          type: 'source',
-          subtype: 'postgres',
-          x: 80,
-          y: 160,
-          isValid: Boolean(pgConfig.host && pgConfig.database_name),
-          title: pgConfig.name || 'PostgreSQL Database Source',
-          subtitle: pgConfig.database_name || pgConfig.database || `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
-          config: {
-            name: pgConfig.name || 'PostgreSQL Data Source',
-            host: pgConfig.host || 'localhost',
-            port: String(pgConfig.port || '5432'),
-            database: pgConfig.database_name || pgConfig.database || `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
-            username: pgConfig.username || '',
-            password: pgConfig.password || '',
-            useSSL: Boolean(pgConfig.use_ssl),
-          },
-        };
-
-        const defaultS3Node = {
-          id: s3Id,
-          type: 'destination',
-          subtype: 's3',
-          x: 460,
-          y: 160,
-          isValid: Boolean(s3Config.bucket_name && s3Config.access_key_id),
-          title: s3Config.name || 'Amazon S3 Vault Destination',
-          subtitle: s3Config.bucket_name ? `s3://${s3Config.bucket_name}/${s3Config.folder_path || ''}` : 'Amazon S3 Vault',
-          config: {
-            name: s3Config.name || 'Amazon S3 Vault',
-            bucketName: s3Config.bucket_name || '',
-            region: s3Config.region || 'ap-south-1',
-            accessKeyId: s3Config.access_key_id || '',
-            secretAccessKey: s3Config.secret_access_key || '',
-            folderPath: s3Config.folder_path || '',
-          },
-        };
-
-        setNodes([defaultPgNode, defaultS3Node]);
-        setConnections([{ id: `conn_${Date.now()}`, sourceId: pgId, targetId: s3Id }]);
-        setSelectedNodeId(pgId);
-      } catch (err) {
-        console.error('Failed to load canvas data:', err);
-      }
+      // 2. If initialWorkflow is null, show a clean empty canvas for creating a new workflow
+      if (!isSubscribed) return;
+      setNodes([]);
+      setConnections([]);
+      setSelectedNodeId(null);
     }
 
     loadCanvasData();

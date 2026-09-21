@@ -123,14 +123,6 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     }
   };
 
-  const copyConnectionDSN = () => {
-    const dsn = `postgres://virat:vignesh98@localhost:5432/chunkflow_tenant_${tenant?.subdomain || 'acme'}`;
-    navigator.clipboard.writeText(dsn);
-    setCopiedDSN(true);
-    showSuccess('PostgreSQL connection string copied to clipboard!', 'DSN Copied');
-    setTimeout(() => setCopiedDSN(false), 2000);
-  };
-
   const handleNavSelect = (sectionId) => {
     setSelectedWorkflow(null);
     setActiveSection(sectionId);
@@ -172,7 +164,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       group: 'BACKUP & PIPELINES',
       items: [
         { id: 'snapshots', label: 'Backup Vault', icon: Database, badge: String(snapshotCount) },
-        { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
+        // { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
       ],
     },
   ];
@@ -293,18 +285,6 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
         <div className="p-2 sm:p-3 border-t border-slate-100 bg-slate-50/60 space-y-2">
           {!isSidebarCollapsed ? (
             <>
-              {/* <button
-                onClick={copyConnectionDSN}
-                className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-orange-500/50 text-slate-700 font-mono text-[11px] font-bold flex items-center justify-between cursor-pointer transition-all shadow-xs"
-              >
-                <span className="flex items-center gap-1.5 text-xs font-sans text-slate-900">
-                  <Lock size={13} className="text-[#f95716]" /> DSN
-                </span>
-                <span className={`text-[10px] font-bold ${copiedDSN ? 'text-emerald-600' : 'text-[#f95716]'}`}>
-                  {copiedDSN ? 'Copied!' : 'Copy DSN'}
-                </span>
-              </button> */}
-
               <button
                 onClick={() => setShowSettingsModal(true)}
                 className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
@@ -315,14 +295,6 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
             </>
           ) : (
             <div className="flex flex-col gap-2 items-center">
-              {/* <button
-                onClick={copyConnectionDSN}
-                className="p-2 rounded-xl bg-white border border-slate-200 hover:border-orange-500 text-slate-700 transition-all cursor-pointer shadow-xs"
-                title="Copy Database DSN"
-              >
-                <Lock size={16} className="text-[#f95716]" />
-              </button> */}
-
               <button
                 onClick={() => setShowSettingsModal(true)}
                 className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-all cursor-pointer shadow-xs"
@@ -369,23 +341,6 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
                   <span>Target DB: <code className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200 font-bold">chunkflow_tenant_{tenant?.subdomain}</code></span>
                   <span>Tenant UUID: <code className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{tenant?.id}</code></span>
                 </div> */}
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-xs space-y-2 relative z-10 shrink-0 w-full sm:w-auto min-w-[280px] shadow-xs">
-                <div className="font-mono font-bold text-[#f95716] flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-1.5">
-                    <Lock size={14} /> Connection DSN
-                  </span>
-                  <button 
-                    onClick={copyConnectionDSN}
-                    className="text-[11px] text-slate-500 hover:text-slate-900 font-bold cursor-pointer"
-                  >
-                    {copiedDSN ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
-                <code className="font-mono text-[11px] text-sky-600 font-semibold bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 block break-all">
-                  postgres://localhost:5432/chunkflow_tenant_{tenant?.subdomain}
-                </code>
               </div>
             </div>
 
