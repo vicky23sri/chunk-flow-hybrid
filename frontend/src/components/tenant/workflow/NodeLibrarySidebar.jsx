@@ -14,11 +14,11 @@ export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
           </p>
         </div>
 
-        {/* Draggable PostgreSQL Source Node */}
+        {/* Draggable Database Source Node */}
         <div className="space-y-3">
           <div>
             <span className="text-[10px] sm:text-[11px] font-mono font-bold text-blue-600 uppercase mb-1.5 flex items-center gap-1.5 tracking-tight">
-              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" /> 1. PostgreSQL (Source)
+              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" /> 1. Database (Source)
             </span>
             <div
               draggable
@@ -31,10 +31,10 @@ export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                  PostgreSQL Database
+                  Database Source
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-slate-500 font-normal truncate">
-                  Select from tenant DB list
+                  Relational Database Connection
                 </div>
               </div>
             </div>

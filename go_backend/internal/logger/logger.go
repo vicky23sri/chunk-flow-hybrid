@@ -58,6 +58,25 @@ func WriteTenantConfigLog(subdomain string, postgres, s3 map[string]interface{})
 	log.Print(entry)
 }
 
+// WriteTenantConfigDetailLog logs detailed INSERT/UPDATE operations for tenant configurations.
+func WriteTenantConfigDetailLog(opAction, subdomain, configType, recordID, detail string) {
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/tenant_configs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("[LOG_ERR] Failed to open tenant_configs.log: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	entry := fmt.Sprintf("[%s] [TENANT_CONFIG_%s] TYPE=\"%s\" SUBDOMAIN=%s ID=%s DETAILS=\"%s\"\n",
+		timestamp, opAction, configType, subdomain, recordID, detail)
+
+	logFile.WriteString(entry)
+	log.Print(entry)
+}
+
+
 // WriteCryptoLog logs crypto events, key mismatches, and failures to logs/crypto.log and stdout.
 func WriteCryptoLog(operation, status, errDetail string) {
 	_ = os.MkdirAll("logs", 0755)

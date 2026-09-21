@@ -238,7 +238,7 @@ export default function PostgresConfigForm({
             </span>
           </div>
           <p className="text-[11px] text-emerald-700 leading-snug pl-8">
-            <strong className="font-bold text-emerald-900">Disclaimer:</strong> PostgreSQL database parameters authenticated successfully. The <span className="font-bold text-slate-900 underline decoration-emerald-500 decoration-2">"Save Config"</span> button is now activated.
+            <strong className="font-bold text-emerald-900">Disclaimer:</strong> Database parameters authenticated successfully. The <span className="font-bold text-slate-900 underline decoration-emerald-500 decoration-2">"Save Config"</span> button is now activated.
           </p>
         </div>
       )}

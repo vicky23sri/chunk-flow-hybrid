@@ -50,15 +50,6 @@ export const savePostgresConfig = (config, subdomain) => {
     const current = getSavedPostgresConfig(subdomain);
     const updated = { ...current, ...config };
     localStorage.setItem(key, JSON.stringify(updated));
-
-    // Async sync to Go backend endpoint
-    const sub = subdomain || getActiveSubdomain() || 'default';
-    fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/tenant-config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': sub },
-      body: JSON.stringify({ subdomain: sub, postgres: updated }),
-    }).catch(() => {});
-
     return updated;
   } catch (err) {
     console.warn('Failed to save PostgreSQL config:', err);
@@ -102,17 +93,9 @@ export const saveS3Config = (config, subdomain) => {
     const current = getSavedS3Config(subdomain);
     const updated = { ...current, ...config };
     localStorage.setItem(key, JSON.stringify(updated));
-
-    // Async sync to Go backend endpoint
-    const sub = subdomain || getActiveSubdomain() || 'default';
-    fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/tenant-config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': sub },
-      body: JSON.stringify({ subdomain: sub, s3: updated }),
-    }).catch(() => {});
-
     return updated;
   } catch (err) {
     console.warn('Failed to save S3 config:', err);
   }
 };
+

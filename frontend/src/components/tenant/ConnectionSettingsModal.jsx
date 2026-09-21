@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Cloud, Plug, Save, X, ShieldCheck, RefreshCw } from 'lucide-react';
 import { getSavedPostgresConfig, savePostgresConfig, getSavedS3Config, saveS3Config } from '../../services/connectionStorage';
+import { api } from '../../services/api';
 import { useFormValidation } from '../../hooks/useFormValidation';
 import PostgresConfigForm from './workflow/PostgresConfigForm';
 import S3ConfigForm from './workflow/S3ConfigForm';
@@ -55,7 +56,7 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
     }, 800);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!testResult?.success) return;
     const isPgOk = pgVal.validatePostgres(pgConfig);
@@ -63,8 +64,10 @@ export default function ConnectionSettingsModal({ tenant, onClose, onSave }) {
 
     if (!isPgOk || !isS3Ok) return;
 
-    savePostgresConfig(pgConfig);
-    saveS3Config(s3Config);
+    savePostgresConfig(pgConfig, tenant?.subdomain);
+    saveS3Config(s3Config, tenant?.subdomain);
+
+    await api.saveTenantConfig({ postgres: pgConfig, s3: s3Config });
 
     if (onSave) {
       onSave({ pgConfig, s3Config });
