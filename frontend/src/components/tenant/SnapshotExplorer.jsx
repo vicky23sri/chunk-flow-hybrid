@@ -16,7 +16,6 @@ export default function SnapshotExplorer({ tenant, onNavigateToBuilder, onSnapsh
   const [workflows, setWorkflows] = useState([]);
   const [tenantConfig, setTenantConfig] = useState({ postgres: [], s3: [] });
   const [copiedId, setCopiedId] = useState(null);
-  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
   const [selectedTab, setSelectedTab] = useState('all');
 
   const loadData = async () => {
@@ -51,26 +50,6 @@ export default function SnapshotExplorer({ tenant, onNavigateToBuilder, onSnapsh
   useEffect(() => {
     loadData();
   }, [tenant?.subdomain]);
-
-  const handleCreateInstantSnapshot = () => {
-    setIsCreatingSnapshot(true);
-    setTimeout(() => {
-      setIsCreatingSnapshot(false);
-      const newSnapId = `snap_${Date.now().toString().slice(-6)}`;
-      const newWf = {
-        id: `snap_${Date.now()}`,
-        name: `Automated FastCDC Snapshot ${newSnapId}`,
-        status: 'deployed',
-        source_name: tenantConfig.postgres?.[0]?.name || 'PostgreSQL Source',
-        destination_name: tenantConfig.s3?.[0]?.name || 'Amazon S3 Vault',
-        created_at: new Date().toISOString(),
-      };
-      const updated = [newWf, ...workflows];
-      setWorkflows(updated);
-      if (onSnapshotChange) onSnapshotChange();
-      showSuccess('Instant AES-256 encrypted database snapshot generated!', 'Snapshot Vaulted');
-    }, 700);
-  };
 
   const handleDownloadSnapshot = (wf) => {
     const timeStr = new Date(wf.created_at || Date.now()).toISOString();
@@ -147,7 +126,7 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
 
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
               <Database size={26} className="text-[#f95716]" />
-              Snapshots & Backup Vault
+              Backup Vault & History
             </h1>
 
             <p className="text-slate-500 text-xs sm:text-sm mt-1 font-normal">
@@ -157,25 +136,6 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-3 flex-wrap shrink-0">
-            <button
-              onClick={handleCreateInstantSnapshot}
-              disabled={isCreatingSnapshot}
-              className="px-4 py-2.5 rounded-xl bg-[#f95716] hover:bg-orange-600 text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
-            >
-              <Sparkles size={15} className={isCreatingSnapshot ? 'animate-spin' : ''} />
-              <span>{isCreatingSnapshot ? 'Generating...' : 'Create Instant Snapshot'}</span>
-            </button>
-
-            {onNavigateToBuilder && (
-              <button
-                onClick={onNavigateToBuilder}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2 shadow-xs"
-              >
-                <Plus size={15} />
-                <span>Deploy Pipeline</span>
-              </button>
-            )}
-
             <button
               onClick={loadData}
               disabled={isRefreshing}
@@ -249,55 +209,32 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left max-w-2xl mx-auto">
 
                   {/* Card 1 */}
                   <div
-                    onClick={handleCreateInstantSnapshot}
+                    onClick={onNavigateToBuilder}
                     className="bg-slate-50/80 border border-slate-200 hover:border-orange-500 p-6 rounded-2xl transition-all cursor-pointer shadow-xs hover:shadow-md group flex flex-col justify-between"
                   >
                     <div>
                       <div className="w-11 h-11 rounded-2xl bg-orange-50 text-[#f95716] border border-orange-200 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                        <Sparkles size={22} />
-                      </div>
-                      <h4 className="font-extrabold text-base text-slate-900 mb-1 group-hover:text-[#f95716] transition-colors">
-                        1. Take Instant Backup
-                      </h4>
-                      <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                        Generate an immediate AES-256 encrypted dump of PostgreSQL tenant tables.
-                      </p>
-                    </div>
-
-                    <div className="mt-5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-[#f95716]">
-                      <span>Create Snapshot</span>
-                      <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-
-                  {/* Card 2 */}
-                  <div
-                    onClick={onNavigateToBuilder}
-                    className="bg-slate-50/80 border border-slate-200 hover:border-slate-800 p-6 rounded-2xl transition-all cursor-pointer shadow-xs hover:shadow-md group flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
                         <Layers size={22} />
                       </div>
-                      <h4 className="font-extrabold text-base text-slate-900 mb-1 group-hover:text-slate-900 transition-colors">
-                        2. Deploy Workflow Canvas
+                      <h4 className="font-extrabold text-base text-slate-900 mb-1 group-hover:text-[#f95716] transition-colors">
+                        1. Deploy Workflow Canvas
                       </h4>
                       <p className="text-xs text-slate-500 leading-relaxed font-normal">
                         Connect PostgreSQL source nodes to S3 destination targets visually.
                       </p>
                     </div>
 
-                    <div className="mt-5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-900">
-                      <span>Open Canvas</span>
+                    <div className="mt-5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-[#f95716]">
+                      <span>Open Canvas Builder</span>
                       <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
 
-                  {/* Card 3 */}
+                  {/* Card 2 */}
                   <div
                     className="bg-slate-50/80 border border-slate-200 p-6 rounded-2xl shadow-xs flex flex-col justify-between opacity-90"
                   >
@@ -306,7 +243,7 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
                         <ShieldCheck size={22} />
                       </div>
                       <h4 className="font-extrabold text-base text-slate-900 mb-1">
-                        3. FastCDC Deduplication
+                        2. FastCDC Deduplication
                       </h4>
                       <p className="text-xs text-slate-500 leading-relaxed font-normal">
                         Hardware-level encryption and content-defined slicing active across all backups.
@@ -342,8 +279,7 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
                       <tr 
                         key={wf.id} 
                         onClick={() => onNavigateToBuilder && onNavigateToBuilder(wf)}
-                        className="hover:bg-orange-50/40 transition-colors cursor-pointer group"
-                        title="Click row to open workflow builder with pipeline nodes"
+                        className="hover:bg-slate-50/80 hover:bg-orange-50/20 transition-colors group cursor-pointer"
                       >
 
                         <td className="py-4 px-4">
@@ -401,29 +337,18 @@ SELECT pg_catalog.set_config('search_path', 'public', false);
                           </div>
                         </td>
 
-                        {/* <td className="py-4 px-4 text-right">
+                        <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => onNavigateToBuilder && onNavigateToBuilder(wf)}
-                              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                              className="px-3 py-2 rounded-xl bg-slate-100 group-hover:bg-[#f95716] group-hover:text-white text-slate-700 font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                               title="Open Canvas Builder"
                             >
-                              <Layers size={13} className="text-[#f95716]" />
+                              <Layers size={13} className="text-[#f95716] group-hover:text-white" />
                               <span>Open Canvas</span>
                             </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadSnapshot(wf);
-                              }}
-                              className="px-3.5 py-2 rounded-xl bg-[#f95716] hover:bg-orange-600 text-white font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs active:scale-95"
-                            >
-                              <Download size={13} />
-                              <span>Download SQL</span>
-                            </button>
                           </div>
-                        </td> */}
+                        </td>
 
                       </tr>
                     );

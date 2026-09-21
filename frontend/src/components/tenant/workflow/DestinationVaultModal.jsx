@@ -77,11 +77,11 @@ export default function DestinationVaultModal({
 
           <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
-              <Lock size={18} />
+              <Folder size={18} />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider block">Storage</span>
-              <span className="text-xs font-bold text-slate-900 truncate block">{storageClass}</span>
+              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider block">Target Folder</span>
+              <span className="text-xs font-bold text-slate-900 truncate block font-mono">{folderPath || '/'}</span>
             </div>
           </div>
         </div>
@@ -104,11 +104,7 @@ export default function DestinationVaultModal({
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span>Destination Folder Prefix: <strong className="font-mono text-emerald-800">{folderPath}</strong></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span>Encryption Engine: <strong className="text-slate-900">{encryption}</strong></span>
+                <span>Destination Folder Prefix: <strong className="font-mono text-emerald-800">{folderPath || '/'}</strong></span>
               </div>
             </div>
           </div>

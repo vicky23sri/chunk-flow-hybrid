@@ -237,6 +237,13 @@ func upsertSourceConfig(ctx context.Context, conn sqlConn, sub string, data map[
 		rows.Close()
 	}
 
+	// Ensure input fields are decrypted first if they were passed in encrypted format
+	host, _ = crypto.Decrypt(host)
+	port, _ = crypto.Decrypt(port)
+	dbName, _ = crypto.Decrypt(dbName)
+	username, _ = crypto.Decrypt(username)
+	password, _ = crypto.Decrypt(password)
+
 	// Encrypt sensitive fields (host, port, database_name, username, password)
 	encHost, _ := crypto.Encrypt(host)
 	encPort, _ := crypto.Encrypt(port)
@@ -313,6 +320,12 @@ func upsertDestinationConfig(ctx context.Context, conn sqlConn, sub string, data
 		}
 		dRows.Close()
 	}
+
+	// Ensure input fields are decrypted first if they were passed in encrypted format
+	bucket, _ = crypto.Decrypt(bucket)
+	accessKey, _ = crypto.Decrypt(accessKey)
+	secret, _ = crypto.Decrypt(secret)
+	folder, _ = crypto.Decrypt(folder)
 
 	// Encrypt sensitive S3 credentials (bucket_name, access_key_id, secret_access_key, folder_path)
 	encBucket, _ := crypto.Encrypt(bucket)

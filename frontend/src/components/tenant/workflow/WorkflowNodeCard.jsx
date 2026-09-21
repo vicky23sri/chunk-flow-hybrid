@@ -67,10 +67,10 @@ export default function WorkflowNodeCard({
           </div>
 
           <div className="min-w-0">
-            <h4 className="font-bold text-xs text-slate-900 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
-              {node.title}
+            <h4 className="font-bold text-xs text-slate-900 leading-tight whitespace-nowrap overflow-hidden text-ellipsis" title={node.config?.name || node.title}>
+              {node.config?.name || node.title}
             </h4>
-            <p className="text-[11px] font-mono text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis mt-0.5">
+            <p className="text-[11px] font-mono text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis mt-0.5" title={node.subtitle}>
               {node.subtitle}
             </p>
           </div>

@@ -8,20 +8,46 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"os"
+
+	"chunkflow-backend/internal/logger"
 )
+
+// getCandidateKeys returns all candidate 32-byte AES keys derived via SHA-256
+// to support decryption across key rotations and legacy fallback keys.
+func getCandidateKeys() [][]byte {
+	var keys [][]byte
+	seen := make(map[string]bool)
+
+	addKey := func(k string) {
+		if k == "" || seen[k] {
+			return
+		}
+		seen[k] = true
+		h := sha256.Sum256([]byte(k))
+		keys = append(keys, h[:])
+	}
+
+	// 1. Explicit environment variables
+	addKey(os.Getenv("APP_ENCRYPTION_KEY"))
+	addKey(os.Getenv("APP_KEY"))
+
+	// 2. Project standard encryption keys
+	addKey("chunkflow_aes256_gcm_master_secret_key_32bytes")
+	addKey("chunkflow_tenant_secure_master_key")
+
+	return keys
+}
 
 // getEncryptionKey derives a 32-byte AES-256 key via SHA-256
 // from the APP_ENCRYPTION_KEY or APP_KEY environment variables.
 func getEncryptionKey() []byte {
-	envKey := os.Getenv("APP_ENCRYPTION_KEY")
-	if envKey == "" {
-		envKey = os.Getenv("APP_KEY")
+	keys := getCandidateKeys()
+	if len(keys) > 0 {
+		return keys[0]
 	}
-	if envKey == "" {
-		envKey = "chunkflow_tenant_secure_master_key"
-	}
-	hash := sha256.Sum256([]byte(envKey))
+	hash := sha256.Sum256([]byte("chunkflow_tenant_secure_master_key"))
 	return hash[:]
 }
 
@@ -32,20 +58,31 @@ func Encrypt(plaintext string) (string, error) {
 		return "", nil
 	}
 
+	// Ensure we don't double-encrypt if input is already encrypted
+	if decrypted, err := Decrypt(plaintext); err == nil && decrypted != "" && decrypted != plaintext {
+		plaintext = decrypted
+	}
+
 	key := getEncryptionKey()
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", fmt.Errorf("crypto: cipher creation failed: %w", err)
+		errStr := fmt.Sprintf("cipher creation failed: %v", err)
+		logger.WriteCryptoLog("ENCRYPT", "ERROR", errStr)
+		return "", fmt.Errorf("crypto: %s", errStr)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("crypto: GCM creation failed: %w", err)
+		errStr := fmt.Sprintf("GCM creation failed: %v", err)
+		logger.WriteCryptoLog("ENCRYPT", "ERROR", errStr)
+		return "", fmt.Errorf("crypto: %s", errStr)
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", fmt.Errorf("crypto: nonce generation failed: %w", err)
+		errStr := fmt.Sprintf("nonce generation failed: %v", err)
+		logger.WriteCryptoLog("ENCRYPT", "ERROR", errStr)
+		return "", fmt.Errorf("crypto: %s", errStr)
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
@@ -53,7 +90,7 @@ func Encrypt(plaintext string) (string, error) {
 }
 
 // Decrypt decrypts a base64-encoded ciphertext (containing [nonce + ciphertext]) using AES-256-GCM.
-// If the input is empty or invalid base64, returns the input as-is or error.
+// Tries candidate keys and handles recursive decryption to resolve double-encrypted legacy data.
 func Decrypt(encoded string) (string, error) {
 	if encoded == "" {
 		return "", nil
@@ -65,29 +102,50 @@ func Decrypt(encoded string) (string, error) {
 		return encoded, nil
 	}
 
-	key := getEncryptionKey()
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("crypto: cipher creation failed: %w", err)
+	candidateKeys := getCandidateKeys()
+	for idx, key := range candidateKeys {
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			continue
+		}
+
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			continue
+		}
+
+		nonceSize := gcm.NonceSize()
+		if len(ciphertext) < nonceSize {
+			continue
+		}
+
+		nonce, actualCiphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+		plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
+		if err == nil {
+			res := string(plaintext)
+			if idx > 0 {
+				log.Printf("[CRYPTO_NOTICE] Decrypted payload using candidate key index #%d", idx)
+			}
+			// Handle potential legacy double-encryption recursively
+			if res != encoded {
+				if nested, errN := Decrypt(res); errN == nil && nested != res {
+					return nested, nil
+				}
+			}
+			return res, nil
+		}
 	}
 
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", fmt.Errorf("crypto: GCM creation failed: %w", err)
+	// Log warning if payload looked like base64 ciphertext but no candidate key succeeded
+	if len(ciphertext) >= 16 {
+		snip := encoded
+		if len(snip) > 20 {
+			snip = snip[:20] + "..."
+		}
+		errMsg := fmt.Sprintf("Failed to decrypt base64 payload (len=%d, snippet='%s'): tested %d candidate keys, none authenticated GCM payload.", len(encoded), snip, len(candidateKeys))
+		logger.WriteCryptoLog("DECRYPT", "WARN", errMsg)
 	}
 
-	nonceSize := gcm.NonceSize()
-	if len(ciphertext) < nonceSize {
-		// Too short to be encrypted ciphertext, return as-is
-		return encoded, nil
-	}
-
-	nonce, actualCiphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
-	if err != nil {
-		// Decryption failed (e.g. legacy plaintext string stored in DB)
-		return encoded, nil
-	}
-
-	return string(plaintext), nil
+	// Decryption failed with all candidate keys (e.g. legacy plaintext string stored in DB)
+	return encoded, nil
 }

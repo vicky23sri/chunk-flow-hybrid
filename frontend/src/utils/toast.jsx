@@ -3,6 +3,11 @@ import { toast } from 'react-toastify';
 
 export { toast };
 
+const getToastId = (message, title) => {
+  const str = typeof message === 'string' ? message : JSON.stringify(message);
+  return `${title || ''}_${str}`;
+};
+
 export const showSuccess = (message, title) => {
   const content = title ? (
     <div>
@@ -12,7 +17,7 @@ export const showSuccess = (message, title) => {
   ) : (
     message
   );
-  toast.success(content);
+  toast.success(content, { toastId: getToastId(message, title) });
 };
 
 export const showError = (message, title) => {
@@ -24,7 +29,7 @@ export const showError = (message, title) => {
   ) : (
     message
   );
-  toast.error(content);
+  toast.error(content, { toastId: getToastId(message, title) });
 };
 
 export const showWarning = (message, title) => {
@@ -36,7 +41,7 @@ export const showWarning = (message, title) => {
   ) : (
     message
   );
-  toast.warn(content);
+  toast.warn(content, { toastId: getToastId(message, title) });
 };
 
 export const showInfo = (message, title) => {
@@ -48,5 +53,5 @@ export const showInfo = (message, title) => {
   ) : (
     message
   );
-  toast.info(content);
+  toast.info(content, { toastId: getToastId(message, title) });
 };

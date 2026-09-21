@@ -18,6 +18,21 @@ export default function PostgresConfigForm({
 
   return (
     <div className="space-y-4 text-xs text-left">
+      {/* Configuration Name */}
+      <div>
+        <label className="text-xs font-bold text-slate-800 block mb-1">
+          Configuration Name <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={config.name ?? ''}
+          placeholder="e.g. Primary Production Database"
+          disabled={readOnly}
+          onChange={(e) => handleChange('name', e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900 font-semibold rounded-xl px-3.5 py-2.5 text-xs outline-none shadow-xs transition-all"
+        />
+      </div>
+
       {/* Host */}
       <div>
         <label className="text-xs font-bold text-slate-800 block mb-1">

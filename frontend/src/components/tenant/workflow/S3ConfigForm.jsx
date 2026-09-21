@@ -166,6 +166,21 @@ export default function S3ConfigForm({
 
   return (
     <div className="space-y-4 text-xs text-left">
+      {/* Configuration Name */}
+      <div>
+        <label className="text-xs font-bold text-slate-800 block mb-1">
+          Configuration Name <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={config.name ?? ''}
+          placeholder="e.g. Primary S3 Backup Vault"
+          disabled={readOnly}
+          onChange={(e) => handleChange('name', e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] text-slate-900 font-semibold rounded-xl px-3.5 py-2.5 text-xs outline-none shadow-xs transition-all"
+        />
+      </div>
+
       {/* Bucket Name */}
       <div>
         <label className="text-xs font-bold text-slate-800 block mb-1">
@@ -285,39 +300,7 @@ export default function S3ConfigForm({
         />
       </div>
 
-      {/* Storage Settings */}
-      <div className="pt-3 border-t border-slate-100 space-y-3">
-        <h4 className="font-bold text-xs text-slate-900">Storage Settings</h4>
 
-        <div>
-          <label className="text-xs font-bold text-slate-800 block mb-1">Encryption</label>
-          <select
-            value={config.encryption || 'AES-256 Server-Side Encryption'}
-            disabled={readOnly}
-            onChange={(e) => handleChange('encryption', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium outline-none shadow-xs transition-all cursor-pointer"
-          >
-            <option value="AES-256 Server-Side Encryption">AES-256 Server-Side Encryption</option>
-            <option value="AWS-KMS">AWS-KMS (Key Management Service)</option>
-            <option value="None">None</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs font-bold text-slate-800 block mb-1">Storage Class</label>
-          <select
-            value={config.storageClass || 'Standard'}
-            disabled={readOnly}
-            onChange={(e) => handleChange('storageClass', e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#f95716] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium outline-none shadow-xs transition-all cursor-pointer"
-          >
-            <option value="Standard">Standard</option>
-            <option value="Intelligent-Tiering">Intelligent-Tiering</option>
-            <option value="Glacier Instant Retrieval">Glacier Instant Retrieval</option>
-            <option value="Deep Archive">Deep Archive</option>
-          </select>
-        </div>
-      </div>
 
       {/* Test Connection Disclaimer & Status */}
       {testResult && (testResult.success || testResult.type === 'success') && (

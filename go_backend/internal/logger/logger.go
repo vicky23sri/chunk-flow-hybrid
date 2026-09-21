@@ -57,3 +57,20 @@ func WriteTenantConfigLog(subdomain string, postgres, s3 map[string]interface{})
 	logFile.WriteString(entry)
 	log.Print(entry)
 }
+
+// WriteCryptoLog logs crypto events, key mismatches, and failures to logs/crypto.log and stdout.
+func WriteCryptoLog(operation, status, errDetail string) {
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/crypto.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("[LOG_ERR] Failed to open crypto.log: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	entry := fmt.Sprintf("[%s] [CRYPTO_%s] OP=%s DETAILS=\"%s\"\n", timestamp, status, operation, errDetail)
+
+	logFile.WriteString(entry)
+	log.Print(entry)
+}

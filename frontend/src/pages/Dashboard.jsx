@@ -68,24 +68,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     if (isInitial) setLoading(true);
     setError('');
     try {
-      const results = await Promise.allSettled([
-        api.getProjects(),
-        api.getDocuments(),
-        api.getRLSStatus(),
-        api.getWorkflows(),
-      ]);
-
-      const projRes = results[0].status === 'fulfilled' ? results[0].value : [];
-      const docRes = results[1].status === 'fulfilled' ? results[1].value : null;
-      const rlsRes = results[2].status === 'fulfilled' ? results[2].value : null;
-      const wfRes = results[3].status === 'fulfilled' ? results[3].value : null;
-
-      if (Array.isArray(projRes)) setProjects(projRes);
-      if (docRes && docRes.documents) {
-        setDocuments(docRes.documents);
-        setBucketPrefix(docRes.bucket_prefix);
-      }
-      if (rlsRes) setRlsInfo(rlsRes);
+      const wfRes = await api.getWorkflows();
       if (wfRes && Array.isArray(wfRes.workflows)) {
         setSnapshotCount(wfRes.workflows.length);
       }
@@ -149,6 +132,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   };
 
   const handleNavSelect = (sectionId) => {
+    setSelectedWorkflow(null);
     setActiveSection(sectionId);
     // On tablet & mobile (<1024px), collapse sidebar after selecting item
     if (window.innerWidth < 1024) {
@@ -187,16 +171,8 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     {
       group: 'BACKUP & PIPELINES',
       items: [
+        { id: 'snapshots', label: 'Backup Vault', icon: Database, badge: String(snapshotCount) },
         { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
-        { id: 'snapshots', label: 'Snapshots & Vault', icon: Database, badge: String(snapshotCount) },
-      ],
-    },
-    {
-      group: 'STORAGE & SECURITY',
-      items: [
-        { id: 'projects', label: 'Projects', icon: FolderGit2, count: projects.length },
-        { id: 's3', label: 'S3 Storage', icon: HardDrive, count: documents.length },
-        { id: 'security', label: 'Security & Isolation', icon: ShieldCheck, badge: '100%' },
       ],
     },
   ];
@@ -204,7 +180,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   const activeItem = sidebarNav.flatMap((g) => g.items).find((i) => i.id === activeSection);
 
   return (
-    <div className="min-h-[calc(100vh-65px)] bg-[#f8fafc] text-slate-900 flex flex-row text-left font-sans relative">
+    <div className="h-full w-full bg-[#f8fafc] text-slate-900 flex flex-row text-left font-sans relative overflow-hidden">
       
       {/* ── MOBILE / TABLET BACKDROP OVERLAY WHEN EXPANDED ───────────────────── */}
       {!isSidebarCollapsed && (
@@ -216,7 +192,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
 
       {/* ── UNIFIED SIDEBAR NAVIGATION (MOBILE, TABLET & DESKTOP) ─────────────── */}
       <aside 
-        className={`bg-white border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-all duration-300 ease-in-out h-[calc(100vh-65px)] sticky top-[65px] ${
+        className={`bg-white border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-all duration-300 ease-in-out h-full ${
           isSidebarCollapsed 
             ? 'w-16 lg:w-20 shadow-xs' 
             : 'fixed left-0 top-[65px] bottom-0 w-64 shadow-2xl lg:shadow-xs lg:static lg:w-64'
@@ -361,7 +337,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       </aside>
 
       {/* ── 2. MAIN WORKSPACE CONTENT AREA ───────────────────────────────────── */}
-      <main className="flex-1 p-4 sm:p-5 md:p-6 space-y-6 overflow-y-auto flex flex-col min-h-[calc(100vh-65px)]">
+      <main className="flex-1 h-full overflow-y-auto p-4 sm:p-5 md:p-6 space-y-6 flex flex-col">
         
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3.5 rounded-2xl flex items-center gap-2.5 text-xs font-bold">
@@ -413,31 +389,18 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
               </div>
             </div>
 
-            {/* 4 Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* 3 Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left hover:border-orange-500/40 transition-all">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">Active Projects</span>
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">Vault Pipelines</span>
                   <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#f95716] flex items-center justify-center">
-                    <FolderGit2 size={18} />
+                    <Database size={18} />
                   </div>
                 </div>
-                <div className="text-3xl font-black text-slate-950 leading-none mb-2">{projects.length}</div>
+                <div className="text-3xl font-black text-slate-950 leading-none mb-2">{snapshotCount}</div>
                 <div className="text-xs text-slate-500 font-normal">
-                  Database table: <code className="font-mono text-slate-700 font-bold">projects</code>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left hover:border-sky-500/40 transition-all">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">S3 Objects Stored</span>
-                  <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                    <HardDrive size={18} />
-                  </div>
-                </div>
-                <div className="text-3xl font-black text-slate-950 leading-none mb-2">{documents.length}</div>
-                <div className="text-xs text-slate-500 font-normal">
-                  Storage volume: <strong className="text-sky-600 font-mono font-bold">{totalStorageMB} MB</strong>
+                  Deployed backup & vault pipelines
                 </div>
               </div>
 
@@ -471,7 +434,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
             {/* Quick Actions Shortcuts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div 
-                onClick={() => setActiveSection('workflow')}
+                onClick={() => handleNavigateToBuilder(null)}
                 className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-orange-500/50 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
               >
                 <div className="flex items-center gap-4">
@@ -499,7 +462,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
                     <p className="text-xs text-slate-500">Cron rules and FastCDC snapshot telemetry</p>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-slate-400" />
+                <ChevronRight size={20} className="text-slate-[#f95716]" />
               </div>
             </div>
 
@@ -508,7 +471,11 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
 
         {/* ── SECTION: WORKFLOW BUILDER ───────────────────────────────── */}
         {activeSection === 'workflow' && (
-          <WorkflowBuilder tenant={tenant} initialWorkflow={selectedWorkflow} />
+          <WorkflowBuilder 
+            key={selectedWorkflow?.id || 'new_workflow'} 
+            tenant={tenant} 
+            initialWorkflow={selectedWorkflow} 
+          />
         )}
 
         {/* ── SECTION: BACKUP SCHEDULER ───────────────────────────────── */}
@@ -525,281 +492,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
           />
         )}
 
-        {/* ── SECTION: PROJECTS ───────────────────────────────────────── */}
-        {activeSection === 'projects' && (
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xs text-left">
-            <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-              <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Tenant Workspace Projects</h2>
-                <p className="text-xs text-slate-500 mt-1 font-normal">
-                  Executed inside <code className="font-mono bg-orange-50 text-[#f95716] px-1.5 py-0.5 rounded border border-orange-200 font-bold">chunkflow_tenant_{tenant?.subdomain}.projects</code>
-                </p>
-              </div>
-              <button 
-                className="px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-[#f95716] hover:bg-orange-600 shadow-md shadow-orange-500/20 transition-all cursor-pointer flex items-center gap-2" 
-                onClick={() => setShowProjectModal(true)}
-              >
-                <Plus size={16} />
-                <span>New Project</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {projects.length === 0 ? (
-                <div className="col-span-full py-16 px-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 rounded-2xl bg-orange-50 text-[#f95716] flex items-center justify-center mb-4 border border-orange-200 shadow-xs">
-                    <FolderGit2 size={26} />
-                  </div>
-                  <h3 className="text-lg font-black text-slate-900 mb-1">
-                    No Tenant Projects Found
-                  </h3>
-                  <p className="text-xs text-slate-500 max-w-md leading-relaxed mb-6 font-normal">
-                    Create your first isolated project workspace inside dedicated PostgreSQL database <code className="font-mono bg-slate-100 text-slate-700 px-1 py-0.5 rounded border border-slate-200">chunkflow_tenant_{tenant?.subdomain}</code>.
-                  </p>
-                  <button
-                    onClick={() => setShowProjectModal(true)}
-                    className="px-6 py-2.5 rounded-full bg-[#f95716] text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                  >
-                    <Plus size={15} />
-                    <span>Create Project Now</span>
-                  </button>
-                </div>
-              ) : (
-                projects.map((proj) => (
-                  <div key={proj.id} className="bg-white border border-slate-200/80 rounded-2xl p-6 flex flex-col justify-between gap-4 shadow-xs hover:shadow-md hover:border-[#f95716]/40 transition-all text-left">
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-black text-lg text-slate-950">{proj.name}</h3>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">{proj.status}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                        {proj.description || 'No description provided for this tenant project.'}
-                      </p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        ID: {proj.id.slice(0, 14)}...
-                      </div>
-                      <button 
-                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-all cursor-pointer" 
-                        onClick={() => handleDeleteProject(proj.id)}
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── SECTION: S3 PARTITION OBJECTS ───────────────────────────── */}
-        {activeSection === 's3' && (
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xs text-left">
-            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-              <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Tenant S3 Partition Objects</h2>
-                <p className="text-xs text-slate-500 mt-1 font-normal">
-                  Multi-tenant isolated storage bucket key structure
-                </p>
-              </div>
-              <button 
-                className="px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-all cursor-pointer flex items-center gap-2" 
-                onClick={() => setShowDocModal(true)}
-              >
-                <Plus size={15} /> Log S3 Object
-              </button>
-            </div>
-
-            <div className="bg-sky-50 border border-sky-200/80 p-4 rounded-2xl mb-6 text-xs text-sky-700 font-mono font-bold flex items-center gap-3">
-              <HardDrive size={18} className="text-sky-600 shrink-0" />
-              <span>Partition Prefix: s3://chunkflow-raw/tenant/{tenant?.id}/data/</span>
-            </div>
-
-            <div className="flex flex-col gap-3.5">
-              {documents.length === 0 ? (
-                <div className="py-14 text-center text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-300 font-normal text-xs">
-                  No storage objects logged in this tenant partition.
-                </div>
-              ) : (
-                documents.map((doc) => (
-                  <div key={doc.id} className="bg-white border border-slate-200/80 rounded-2xl px-6 py-4 flex justify-between items-center shadow-xs hover:border-sky-500/40 hover:shadow-md transition-all">
-                    <div>
-                      <div className="font-bold text-sm text-slate-950 flex items-center gap-2">
-                        <FileText size={16} className="text-sky-500" />
-                        {doc.name}
-                      </div>
-                      <div className="text-xs mt-1.5 text-slate-500 font-mono">
-                        S3 Key: <code className="bg-sky-50 text-sky-700 px-2 py-0.5 rounded border border-sky-200 font-bold">{doc.s3_key}</code>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold bg-sky-50 text-sky-600 border border-sky-200">
-                        {(doc.size_bytes / 1024 / 1024).toFixed(2)} MB
-                      </span>
-                      <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                        {new Date(doc.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── SECTION: SECURITY ISOLATION AUDIT ───────────────────────── */}
-        {activeSection === 'security' && (
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xs text-left">
-            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-              <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight flex items-center gap-2.5">
-                  <ShieldCheck size={24} className="text-emerald-500" />
-                  Database Physical Isolation Audit
-                </h2>
-                <p className="text-xs text-slate-500 mt-1 font-normal">
-                  Verification metrics provided by backend endpoint <code className="font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200 font-bold">/api/v1/rls-status</code>
-                </p>
-              </div>
-              <button 
-                className="px-5 py-2.5 rounded-full text-xs font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-all cursor-pointer flex items-center gap-2" 
-                onClick={loadDashboardData}
-              >
-                <RefreshCw size={14} /> Re-verify Audit
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/80">
-                <div className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Current Database Target
-                </div>
-                <div className="text-lg font-black text-indigo-600 font-mono bg-indigo-50 inline-block px-3 py-1.5 rounded-xl border border-indigo-200">
-                  {rlsInfo?.database || `chunkflow_tenant_${tenant?.subdomain}`}
-                </div>
-                <p className="text-xs text-slate-600 mt-3 leading-relaxed font-normal">
-                  Each request is routed by Go middleware to a dedicated PostgreSQL database with zero shared tables.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/80">
-                <div className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Schema & Scope Level
-                </div>
-                <div className="text-lg font-black text-emerald-600 font-mono bg-emerald-50 inline-block px-3 py-1.5 rounded-xl border border-emerald-200">
-                  {rlsInfo?.schema || 'public (Dedicated DB)'}
-                </div>
-                <p className="text-xs text-slate-600 mt-3 leading-relaxed font-normal">
-                  Full physical database isolation guarantees complete immunity to SQL injection cross-tenant leakage.
-                </p>
-              </div>
-
-            </div>
-          </div>
-        )}
-
       </main>
-
-      {/* Project Creation Modal */}
-      {showProjectModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-50 p-5">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative overflow-hidden w-full max-w-md text-left animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-950 mb-4">
-              Create Tenant Project
-            </h3>
-            <form onSubmit={handleCreateProject} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-900 uppercase font-mono">Project Name</label>
-                <input 
-                  type="text" 
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-[#f95716] focus:bg-white shadow-xs font-medium" 
-                  value={projectName} 
-                  onChange={(e) => setProjectName(e.target.value)} 
-                  required 
-                  placeholder="e.g. Real-Time Data Pipeline" 
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-900 uppercase font-mono">Description</label>
-                <textarea 
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-[#f95716] focus:bg-white shadow-xs font-medium resize-y" 
-                  rows={3} 
-                  value={projectDesc} 
-                  onChange={(e) => setProjectDesc(e.target.value)} 
-                  placeholder="Describe project goals..." 
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button 
-                  type="button" 
-                  className="px-5 py-2.5 text-xs font-bold rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer" 
-                  onClick={() => setShowProjectModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-6 py-2.5 text-xs font-bold rounded-full text-white bg-[#f95716] hover:bg-orange-600 shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-                >
-                  Create Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Doc Creation Modal */}
-      {showDocModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-50 p-5">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative overflow-hidden w-full max-w-md text-left animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-950 mb-4">
-              Log S3 Partition Object
-            </h3>
-            <form onSubmit={handleCreateDoc} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-900 uppercase font-mono">File Name</label>
-                <input 
-                  type="text" 
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-[#f95716] focus:bg-white shadow-xs font-medium" 
-                  value={docName} 
-                  onChange={(e) => setDocName(e.target.value)} 
-                  required 
-                  placeholder="e.g. analytics_q3_raw.parquet" 
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-900 uppercase font-mono">Size (Bytes)</label>
-                <input 
-                  type="number" 
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-[#f95716] focus:bg-white shadow-xs font-medium" 
-                  value={docSize} 
-                  onChange={(e) => setDocSize(e.target.value)} 
-                  required 
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button 
-                  type="button" 
-                  className="px-5 py-2.5 text-xs font-bold rounded-full text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer" 
-                  onClick={() => setShowDocModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-6 py-2.5 text-xs font-bold rounded-full text-white bg-[#f95716] hover:bg-orange-600 shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-                >
-                  Log Storage Object
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Connection Credentials Modal */}
       {showSettingsModal && (
