@@ -13,6 +13,7 @@ import (
 
 	"chunkflow-backend/internal/config"
 	"chunkflow-backend/internal/routes"
+	"chunkflow-backend/internal/scheduler"
 
 	_ "github.com/lib/pq"
 )
@@ -21,7 +22,10 @@ func main() {
 	// 1. Load centralized configuration
 	cfg := config.LoadConfig()
 
-	// 2. Setup Gin Router & Register Routes
+	// 2. Start Automated Cron Engine
+	scheduler.StartScheduler()
+
+	// 3. Setup Gin Router & Register Routes
 	router := routes.SetupRouter(cfg)
 
 	// 3. Configure HTTP Server

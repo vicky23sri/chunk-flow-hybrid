@@ -93,3 +93,22 @@ func WriteCryptoLog(operation, status, errDetail string) {
 	logFile.WriteString(entry)
 	log.Print(entry)
 }
+
+// WriteCronExecutionLog logs background cron execution events to logs/cron_executions.log and stdout.
+func WriteCronExecutionLog(subdomain, cronExp, dbName, statusMessage string) {
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/cron_executions.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("[LOG_ERR] Failed to open cron_executions.log: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	entry := fmt.Sprintf("[%s] [CRON_WORKER] SUBDOMAIN=%s SCHEDULE=\"%s\" DB=\"%s\" MSG=\"%s\"\n",
+		timestamp, subdomain, cronExp, dbName, statusMessage)
+
+	logFile.WriteString(entry)
+	log.Print(entry)
+}
+
