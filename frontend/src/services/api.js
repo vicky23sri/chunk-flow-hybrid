@@ -356,6 +356,55 @@ export const api = {
       return { success: res.ok && data.success !== false, message: data.message, log: data.log };
     } catch (err) {
       return { success: false, message: `Cannot reach Go Backend at ${GO_API_BASE}.` };
+      
+  // ─── Go Backend: List CDC snapshots from master.csv ───────────────────────
+  listSnapshots: async () => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/list-snapshots`);
+      if (!res.ok) return [];
+      const data = await res.json().catch(() => []);
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.error('Error fetching snapshots list:', err);
+      return [];
+    }
+  },
+
+  // ─── Go Backend: Get total CDC physical chunk size ────────────────────────
+  getChunkSize: async () => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/chunk-size`);
+      if (!res.ok) return { physical_size_bytes: 0 };
+      const data = await res.json().catch(() => ({ physical_size_bytes: 0 }));
+      return data;
+    } catch (err) {
+      console.error('Error fetching chunk size:', err);
+      return { physical_size_bytes: 0 };
+    }
+  },
+
+  // ─── Go Backend: Download snapshot hash details ─────────────────────────────
+  downloadSnapshot: async (manifestId) => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: manifestId }),
+      });
+      if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `snapshot-${manifestId}-hashes.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      console.error('Error downloading snapshot hash details:', err);
+      throw err;
     }
   },
 };
@@ -368,5 +417,8 @@ export const saveTenantConfig = (...args) => api.saveTenantConfig(...args);
 export const testDBConnection = (...args) => api.testDBConnection(...args);
 export const getCronLogs = (...args) => api.getCronLogs(...args);
 export const triggerCronJob = (...args) => api.triggerCronJob(...args);
+export const listSnapshots = (...args) => api.listSnapshots(...args);
+export const getChunkSize = (...args) => api.getChunkSize(...args);
+export const downloadSnapshot = (...args) => api.downloadSnapshot(...args);
 
 

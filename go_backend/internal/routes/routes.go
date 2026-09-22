@@ -39,11 +39,19 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		v1.POST("/tenant-config", handlers.SaveTenantConfig)
 		v1.GET("/tenant-config", handlers.GetTenantConfig)
 		v1.POST("/workflow/deploy", handlers.DeployWorkflow)
+		v1.POST("/workflow/trigger-cdc", handlers.TriggerCDCPipeline)
 		v1.GET("/workflows", handlers.GetWorkflows)
 		v1.GET("/scheduler/logs", scheduler.GetCronLogsHandler)
 		v1.GET("/scheduler/queue", scheduler.GetJobQueueHandler)
 		v1.GET("/scheduler/next-run", scheduler.GetNextRunHandler)
 		v1.POST("/scheduler/trigger", scheduler.PostTriggerHandler)
+
+		// FastCDC Snapshot Management Routes
+		v1.GET("/list-snapshots", handlers.ListSnapshots)
+		v1.GET("/snapshots", handlers.ListSnapshots)
+		v1.GET("/chunk-size", handlers.GetChunkSize)
+		v1.POST("/download", handlers.DownloadSnapshot)
+		v1.POST("/download-snapshot", handlers.DownloadSnapshot)
 	}
 
 	return router

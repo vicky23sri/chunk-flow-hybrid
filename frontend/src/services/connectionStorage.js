@@ -18,6 +18,7 @@ export const getSavedPostgresConfig = (subdomain) => {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
+        name: parsed.name ?? '',
         host: parsed.host ?? '',
         port: parsed.port ?? '',
         database: parsed.database ?? '',
@@ -33,6 +34,7 @@ export const getSavedPostgresConfig = (subdomain) => {
   }
 
   return {
+    name: '',
     host: '',
     port: '',
     database: '',
@@ -63,13 +65,14 @@ export const getSavedS3Config = (subdomain) => {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
+        name: parsed.name ?? '',
         bucketName: parsed.bucketName ?? '',
-        region: parsed.region || 'us-west-2',
+        region: parsed.region ?? '',
         accessKeyId: parsed.accessKeyId ?? '',
         secretAccessKey: parsed.secretAccessKey ?? '',
         folderPath: parsed.folderPath ?? '',
-        encryption: parsed.encryption || 'AES-256 Server-Side Encryption',
-        storageClass: parsed.storageClass || 'Standard',
+        encryption: parsed.encryption ?? '',
+        storageClass: parsed.storageClass ?? '',
       };
     }
   } catch (err) {
@@ -77,13 +80,14 @@ export const getSavedS3Config = (subdomain) => {
   }
 
   return {
+    name: '',
     bucketName: '',
-    region: 'us-west-2',
+    region: '',
     accessKeyId: '',
     secretAccessKey: '',
     folderPath: '',
-    encryption: 'AES-256 Server-Side Encryption',
-    storageClass: 'Standard',
+    encryption: '',
+    storageClass: '',
   };
 };
 

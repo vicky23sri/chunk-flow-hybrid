@@ -45,33 +45,33 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
   };
 
   return (
-    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-indigo-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-[#f95716] selection:text-white relative overflow-hidden">
       {/* Soft Background Glows */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-indigo-200/50 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[450px] h-[350px] bg-purple-200/50 blur-[110px] rounded-full pointer-events-none" />
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-orange-200/50 blur-[130px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[450px] h-[350px] bg-amber-200/50 blur-[110px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
         
-        {/* Left branding panel — Indigo/Purple Gradient */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-indigo-700 via-purple-700 to-indigo-900 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
+        {/* Left branding panel — Orange/Amber Gradient */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-[#f95716] via-orange-600 to-amber-700 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
           {/* Subtle overlay shapes */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-xs font-semibold mb-6">
-              <Sparkles size={14} className="text-yellow-300" />
+              <Sparkles size={14} className="text-amber-300" />
               <span>Multi-Tenant Onboarding</span>
             </div>
 
             <h1 className="text-2xl font-black text-white leading-tight mb-3 tracking-tight">
               Provision New<br />
-              <span className="text-yellow-300">
+              <span className="text-amber-300">
                 Tenant Workspace
               </span>
             </h1>
 
-            <p className="text-indigo-100 text-xs leading-relaxed mb-6">
+            <p className="text-orange-100 text-xs leading-relaxed mb-6">
               Instant dynamic PostgreSQL database creation with automated domain routing and isolated credentials.
             </p>
 
@@ -81,7 +81,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                   <Database size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-indigo-200 font-medium">Automated Physical DB</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Automated Physical DB</div>
                   <div className="text-xs font-mono font-bold text-white">chunkflow_tenant_...</div>
                 </div>
               </div>
@@ -91,7 +91,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                   <Globe size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-indigo-200 font-medium">Dedicated Subdomain</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Dedicated Subdomain</div>
                   <div className="text-xs font-mono font-bold text-white">&lt;subdomain&gt;.localhost</div>
                 </div>
               </div>
@@ -101,14 +101,14 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                   <ShieldCheck size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-indigo-200 font-medium">Isolation Guarantee</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Isolation Guarantee</div>
                   <div className="text-xs font-bold text-emerald-300">Zero Cross-Tenant Data Leakage</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-indigo-200 flex items-center justify-between mt-6">
+          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-orange-200 flex items-center justify-between mt-6">
             <span>Automated Provisioning</span>
             <span className="font-semibold text-white flex items-center gap-1">
               <CheckCircle2 size={13} className="text-emerald-300" /> Ready
@@ -139,7 +139,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                 <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={tenantName}
                   onChange={(e) => handleSubdomainAutoFill(e.target.value)}
                   placeholder="e.g. Globex Corporation"
@@ -153,7 +153,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
               <div className="flex items-center">
                 <input
                   type="text"
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-l-xl px-4 py-2.5 text-sm font-bold text-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-l-xl px-4 py-2.5 text-sm font-bold text-[#f95716] focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs"
                   value={subdomain}
                   onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="globex"
@@ -165,7 +165,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
               </div>
               <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1.5">
                 <span>Target DB:</span>
-                <code className="font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-[11px] font-semibold">
+                <code className="font-mono bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-100 text-[11px] font-semibold">
                   chunkflow_tenant_{subdomain || '...'}
                 </code>
               </div>
@@ -177,7 +177,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   placeholder="admin@globex.com"
@@ -192,7 +192,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
@@ -203,7 +203,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
 
             <button
               type="submit"
-              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:brightness-105 shadow-md shadow-indigo-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
+              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-[#f95716] via-orange-600 to-amber-600 hover:brightness-105 shadow-md shadow-orange-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
               disabled={loading}
             >
               {loading ? (
@@ -223,7 +223,7 @@ export default function RegisterTenant({ onSuccess, onSwitchToLogin }) {
           <div className="mt-6 text-center text-xs text-slate-500">
             Already have an active tenant workspace?{' '}
             <span
-              className="text-indigo-600 font-bold cursor-pointer underline hover:text-indigo-700"
+              className="text-[#f95716] font-bold cursor-pointer underline hover:text-orange-700"
               onClick={onSwitchToLogin}
             >
               Sign In

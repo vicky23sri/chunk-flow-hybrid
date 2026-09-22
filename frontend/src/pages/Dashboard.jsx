@@ -13,6 +13,7 @@ import {
 import WorkflowBuilder from '../components/tenant/WorkflowBuilder';
 import BackupScheduler from '../components/tenant/BackupScheduler';
 import SnapshotExplorer from '../components/tenant/SnapshotExplorer';
+import SnapshotHistoryView from '../components/tenant/snapshot/SnapshotHistoryView';
 import ConnectionSettingsModal from '../components/tenant/ConnectionSettingsModal';
 
 export default function Dashboard({ user, tenant, onTenantChange }) {
@@ -30,7 +31,8 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const handleNavigateToBuilder = (wf = null) => {
-    setSelectedWorkflow(wf);
+    const targetWf = (wf && typeof wf === 'object' && typeof wf.id === 'string') ? wf : null;
+    setSelectedWorkflow(targetWf);
     setActiveSection('workflow');
   };
 
@@ -164,6 +166,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       group: 'BACKUP & PIPELINES',
       items: [
         { id: 'snapshots', label: 'Backup Vault', icon: Database, badge: String(snapshotCount) },
+        { id: 'history_snapshots', label: 'CDC Snapshots', icon: FileText, badge: 'master.csv' },
         // { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
       ],
     },
@@ -196,7 +199,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
             isSidebarCollapsed ? 'flex-col gap-2.5 items-center' : ''
           }`}>
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-9 h-9 rounded-xl bg-[#f95716] text-white flex items-center justify-center font-black text-base shadow-sm shadow-orange-500/20 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-[#f95716] text-[#ffffff] flex items-center justify-center font-black text-base shadow-sm shadow-orange-500/20 shrink-0">
                 {tenant?.name?.[0] || 'A'}
               </div>
 
@@ -438,13 +441,18 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
           <BackupScheduler tenant={tenant} />
         )}
 
-        {/* ── SECTION: SNAPSHOTS EXPLORER ─────────────────────────────── */}
+        {/* ── SECTION: SNAPSHOTS EXPLORER (BACKUP VAULT) ─────────────── */}
         {activeSection === 'snapshots' && (
           <SnapshotExplorer 
             tenant={tenant} 
             onNavigateToBuilder={handleNavigateToBuilder}
             onSnapshotChange={() => loadDashboardData(false)}
           />
+        )}
+
+        {/* ── SECTION: CDC SNAPSHOTS HISTORY ──────────────────────────── */}
+        {activeSection === 'history_snapshots' && (
+          <SnapshotHistoryView tenant={tenant} />
         )}
 
       </main>

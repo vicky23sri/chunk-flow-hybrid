@@ -23,7 +23,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
             className="flex items-center gap-3 cursor-pointer group shrink-0" 
             onClick={handleLogoClick}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f95716] via-orange-600 to-amber-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
               <Cpu size={22} />
             </div>
             <div className="flex flex-col">
@@ -32,7 +32,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                   ChunkFlow
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase leading-none border ${
-                  isSuperAdmin ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  isSuperAdmin ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-orange-50 text-orange-700 border-orange-200'
                 }`}>
                   {isSuperAdmin ? 'Control Plane' : 'SaaS Engine'}
                 </span>
@@ -51,7 +51,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                 <button
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     currentPage === 'dashboard' 
-                      ? 'bg-white text-indigo-600 shadow-xs' 
+                      ? 'bg-white text-[#f95716] shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                   onClick={() => handleNavClick('dashboard')}
@@ -65,12 +65,12 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                 <button
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     currentPage === 'superadmin' 
-                      ? 'bg-white text-purple-600 shadow-xs' 
+                      ? 'bg-white text-orange-600 shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                   onClick={() => handleNavClick('superadmin')}
                 >
-                  <Crown size={14} className={currentPage === 'superadmin' ? 'text-purple-600' : 'text-slate-400'} />
+                  <Crown size={14} className={currentPage === 'superadmin' ? 'text-orange-600' : 'text-slate-400'} />
                   <span>Super Admin</span>
                 </button>
               )}
@@ -80,13 +80,13 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
           {/* Right: User / Auth Actions */}
           <div className="hidden md:flex items-center gap-3">
             {isSuperAdmin && superAdmin ? (
-              <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl">
-                <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
+              <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+                <div className="w-7 h-7 rounded-lg bg-orange-600 text-white flex items-center justify-center font-bold text-xs">
                   <Crown size={14} />
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold text-slate-900 leading-tight">{superAdmin.email}</div>
-                  <div className="text-[10px] font-extrabold text-purple-700 uppercase leading-none">Super Admin</div>
+                  <div className="text-[10px] font-extrabold text-orange-700 uppercase leading-none">Super Admin</div>
                 </div>
                 <button 
                   className="ml-2 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" 
@@ -97,13 +97,13 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                 </button>
               </div>
             ) : user ? (
-              <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs uppercase">
+              <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-xl">
+                <div className="w-7 h-7 rounded-lg bg-[#f95716] text-white flex items-center justify-center font-bold text-xs uppercase">
                   {user.email?.[0] || 'U'}
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold text-slate-900 leading-tight">{user.email}</div>
-                  <div className="text-[10px] font-extrabold text-indigo-700 uppercase leading-none">{user.role || 'User'}</div>
+                  <div className="text-[10px] font-extrabold text-orange-700 uppercase leading-none">{user.role || 'User'}</div>
                 </div>
                 <button 
                   className="ml-2 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" 
@@ -130,8 +130,8 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                   <button
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       currentPage === 'register' 
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                        ? 'bg-[#f95716] text-white shadow-md shadow-orange-600/20' 
+                        : 'bg-[#f95716] hover:bg-orange-600 text-white shadow-sm'
                     }`}
                     onClick={() => handleNavClick('register')}
                   >
@@ -163,7 +163,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
             {user && (
               <button
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all text-left ${
-                  currentPage === 'dashboard' ? 'bg-indigo-50 text-indigo-700 font-extrabold' : 'text-slate-600 hover:bg-slate-50'
+                  currentPage === 'dashboard' ? 'bg-orange-50 text-[#f95716] font-extrabold' : 'text-slate-600 hover:bg-slate-50'
                 }`}
                 onClick={() => handleNavClick('dashboard')}
               >
@@ -174,7 +174,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
             {isSuperAdmin && (
               <button
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all text-left ${
-                  currentPage === 'superadmin' ? 'bg-purple-50 text-purple-700 font-extrabold' : 'text-slate-600 hover:bg-slate-50'
+                  currentPage === 'superadmin' ? 'bg-amber-50 text-orange-700 font-extrabold' : 'text-slate-600 hover:bg-slate-50'
                 }`}
                 onClick={() => handleNavClick('superadmin')}
               >
@@ -194,7 +194,7 @@ export default function Header({ user, superAdmin, isSuperAdmin, isDomainBased, 
                 </button>
                 {!isDomainBased && (
                   <button
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-indigo-600 text-white flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#f95716] text-white flex items-center justify-center gap-2"
                     onClick={() => handleNavClick('register')}
                   >
                     <UserPlus size={15} /> Register Tenant

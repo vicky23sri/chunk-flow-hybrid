@@ -116,4 +116,24 @@ body {
   animation: marqueeReverse 32s linear infinite;
 }
 
+/* Pipeline Topology Card Animations */
+@keyframes flowLine {
+  0% { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes shimmerBg {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.pipeline-flow-animate {
+  animation: flowLine 3s linear infinite;
+}
+
+.shimmer-bg {
+  background: linear-gradient(90deg, transparent 0%, rgba(249,87,22,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmerBg 3s ease-in-out infinite;
+}
 
