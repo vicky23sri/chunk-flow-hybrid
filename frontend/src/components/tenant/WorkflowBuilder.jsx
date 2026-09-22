@@ -78,22 +78,34 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
 
         if (loadedNodes && loadedNodes.length > 0) {
           const cleanedNodes = loadedNodes.map((n) => {
-            let sub = n.subtitle;
+            const nodeConfig = { ...(n.config || {}) };
+
             if (n.subtype === 'postgres') {
-              sub = n.config?.database || initialWorkflow.source_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`;
+              if (!nodeConfig.name && initialWorkflow.source_name) {
+                nodeConfig.name = initialWorkflow.source_name;
+              }
+              const sub = nodeConfig.database || `chunkflow_tenant_${tenant?.subdomain || 'default'}`;
+              const title = nodeConfig.name || n.title || 'Source Database';
+              return { ...n, title, subtitle: sub, config: nodeConfig };
             } else if (n.subtype === 's3') {
-              const bkt = n.config?.bucketName;
-              const path = n.config?.folderPath || '';
-              sub = bkt ? `s3://${bkt}/${path}` : (initialWorkflow.destination_name || 'Amazon S3 Vault');
+              if (!nodeConfig.name && initialWorkflow.destination_name) {
+                nodeConfig.name = initialWorkflow.destination_name;
+              }
+              const bkt = nodeConfig.bucketName;
+              const path = nodeConfig.folderPath || '';
+              const sub = bkt ? `s3://${bkt}/${path}` : (initialWorkflow.destination_name || 's3://vault/');
+              const title = nodeConfig.name || n.title || 'S3 Destination';
+              return { ...n, title, subtitle: sub, config: nodeConfig };
             }
-            return { ...n, subtitle: sub };
+
+            return n;
           });
 
           if (isSubscribed) {
             setNodes(cleanedNodes);
             setConnections(loadedConns || []);
             setSelectedNodeId(cleanedNodes[0]?.id || null);
-            showSuccess(`Loaded pipeline canvas for "${initialWorkflow.name || 'Snapshot Workflow'}"!`, 'Workflow Canvas Loaded');
+            showSuccess(`Loaded pipeline canvas for "${initialWorkflow.name || 'Workflow Pipeline'}"!`, 'Workflow Canvas Loaded');
           }
           return;
         } else {
@@ -107,13 +119,13 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
             x: 80,
             y: 160,
             isValid: true,
-            title: initialWorkflow.source_name || 'PostgreSQL Database Source',
-            subtitle: initialWorkflow.source_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
+            title: initialWorkflow.source_name || 'Source Database',
+            subtitle: `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
             config: {
-              name: initialWorkflow.source_name || 'PostgreSQL Data Source',
-              host: 'localhost',
-              port: '5432',
-              database: initialWorkflow.source_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
+              name: initialWorkflow.source_name || '',
+              host: '',
+              port: '',
+              database: `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
               username: '',
               password: '',
             },
@@ -125,10 +137,10 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
             x: 460,
             y: 160,
             isValid: true,
-            title: initialWorkflow.destination_name || 'Amazon S3 Vault Destination',
-            subtitle: initialWorkflow.destination_name || 's3://chunkflow-vault-raw/',
+            title: initialWorkflow.destination_name || 'S3 Destination',
+            subtitle: 's3://vault/',
             config: {
-              name: initialWorkflow.destination_name || 'Amazon S3 Vault',
+              name: initialWorkflow.destination_name || '',
               bucketName: '',
               folderPath: '',
             },
@@ -324,7 +336,8 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
       <WorkflowHeader
         deploySuccess={deploySuccess}
         isDeploying={isDeploying}
-        nodeCount={nodes.length}
+        nodes={nodes}
+        connections={connections}
         onClearCanvas={() => setShowClearConfirmModal(true)}
         onDeploy={handleDeploy}
       />

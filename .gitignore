@@ -19,6 +19,14 @@ dist/
 /backend/storage/framework/sessions/*
 /backend/storage/framework/views/*
 
+# FastCDC Vault & Manifest Artifacts
+logs/
+go_backend/logs/
+manifest/
+*.csv
+*.dump
+*.cdc
+
 # IDE Configuration Files
 .vscode/
 .idea/

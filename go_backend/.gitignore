@@ -32,3 +32,11 @@ vendor/
 .DS_Store
 Thumbs.db
 *.log
+
+# FastCDC Vault & Manifest Artifacts
+logs/
+manifest/
+*.csv
+*.dump
+*.cdc
+

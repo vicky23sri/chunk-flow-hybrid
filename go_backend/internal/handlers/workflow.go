@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"chunkflow-backend/internal/cdc"
 	"chunkflow-backend/internal/crypto"
 	"chunkflow-backend/internal/db"
 
@@ -27,8 +28,9 @@ type DeployWorkflowRequest struct {
 }
 
 // DeployWorkflow handles POST /api/v1/workflow/deploy
-// Saves source/destination configurations, maps their DB IDs, and creates
-// a deployment record in the tenant's workflow_deployments table.
+// Saves source/destination configurations, maps their DB IDs, creates
+// a deployment record in the tenant's workflow_deployments table,
+// and executes the FastCDC engine over the tenant database stream.
 func DeployWorkflow(c *gin.Context) {
 	var req DeployWorkflowRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -103,58 +105,101 @@ func DeployWorkflow(c *gin.Context) {
 		workflowName = "PostgreSQL -> S3 Backup Pipeline"
 	}
 
-	// 4. Insert deployment record with source & destination ID mapping
-	var deploymentID string
-	var errInsert error
+	// 4. Upsert deployment record (UPDATE if workflow name already exists, else INSERT)
+	var existingID string
+	_ = conn.QueryRowContext(ctx, `SELECT id FROM workflow_deployments WHERE name = $1 ORDER BY updated_at DESC LIMIT 1`, workflowName).Scan(&existingID)
 
-	if sourceID != "" && destID != "" {
-		errInsert = conn.QueryRowContext(ctx, `
+	var deploymentID string
+	var errDeploy error
+
+	if existingID != "" {
+		deploymentID = existingID
+		_, errDeploy = conn.ExecContext(ctx, `
+			UPDATE workflow_deployments
+			SET status = 'deployed',
+			    source_config_id = NULLIF($1, '')::uuid,
+			    destination_config_id = NULLIF($2, '')::uuid,
+			    nodes_data = $3::jsonb,
+			    connections_data = $4::jsonb,
+			    updated_at = NOW()
+			WHERE id = $5
+		`, sourceID, destID, string(nodesJSON), string(connsJSON), existingID)
+
+		// Delete any stale duplicate rows for the same workflow name
+		_, _ = conn.ExecContext(ctx, `DELETE FROM workflow_deployments WHERE name = $1 AND id != $2`, workflowName, existingID)
+	} else {
+		errDeploy = conn.QueryRowContext(ctx, `
 			INSERT INTO workflow_deployments
 				(name, status, source_config_id, destination_config_id, nodes_data, connections_data, created_at, updated_at)
-			VALUES ($1, 'deployed', $2, $3, $4::jsonb, $5::jsonb, NOW(), NOW())
+			VALUES ($1, 'deployed', NULLIF($2, '')::uuid, NULLIF($3, '')::uuid, $4::jsonb, $5::jsonb, NOW(), NOW())
 			RETURNING id
 		`, workflowName, sourceID, destID, string(nodesJSON), string(connsJSON)).Scan(&deploymentID)
-	} else if sourceID != "" {
-		errInsert = conn.QueryRowContext(ctx, `
-			INSERT INTO workflow_deployments
-				(name, status, source_config_id, nodes_data, connections_data, created_at, updated_at)
-			VALUES ($1, 'deployed', $2, $3::jsonb, $4::jsonb, NOW(), NOW())
-			RETURNING id
-		`, workflowName, sourceID, string(nodesJSON), string(connsJSON)).Scan(&deploymentID)
-	} else if destID != "" {
-		errInsert = conn.QueryRowContext(ctx, `
-			INSERT INTO workflow_deployments
-				(name, status, destination_config_id, nodes_data, connections_data, created_at, updated_at)
-			VALUES ($1, 'deployed', $2, $3::jsonb, $4::jsonb, NOW(), NOW())
-			RETURNING id
-		`, workflowName, destID, string(nodesJSON), string(connsJSON)).Scan(&deploymentID)
-	} else {
-		errInsert = conn.QueryRowContext(ctx, `
-			INSERT INTO workflow_deployments
-				(name, status, nodes_data, connections_data, created_at, updated_at)
-			VALUES ($1, 'deployed', $2::jsonb, $3::jsonb, NOW(), NOW())
-			RETURNING id
-		`, workflowName, string(nodesJSON), string(connsJSON)).Scan(&deploymentID)
 	}
 
-	if errInsert != nil {
+	if errDeploy != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("Failed to deploy workflow to database: %v", errInsert),
+			"message": fmt.Sprintf("Failed to deploy workflow to database: %v", errDeploy),
 		})
 		return
 	}
 
+	// 5. Execute FastCDC engine on source database stream
+	cdcResult, cdcErr := cdc.RunCDCWorkflow(sub, workflowName)
+	if cdcErr != nil {
+		log.Printf("[FASTCDC_WARN] Failed to complete CDC stream for '%s': %v", sub, cdcErr)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":               true,
-		"message":               fmt.Sprintf("Workflow '%s' deployed successfully to tenant DB '%s'!", workflowName, tenantDB),
+		"message":               fmt.Sprintf("Workflow '%s' deployed successfully & FastCDC stream completed for tenant DB '%s'!", workflowName, tenantDB),
 		"deployment_id":         deploymentID,
 		"subdomain":             sub,
 		"source_config_id":      sourceID,
 		"destination_config_id": destID,
 		"status":                "deployed",
+		"fastcdc_result":        cdcResult,
 	})
 }
+
+// TriggerCDCPipeline handles POST /api/v1/workflow/trigger-cdc
+// Manually triggers a FastCDC slicing & deduplication backup stream for a tenant.
+func TriggerCDCPipeline(c *gin.Context) {
+	var body struct {
+		Subdomain    string `json:"subdomain"`
+		WorkflowName string `json:"workflowName"`
+	}
+	_ = c.ShouldBindJSON(&body)
+
+	sub := body.Subdomain
+	if sub == "" {
+		sub = c.GetHeader("X-Tenant-Subdomain")
+	}
+	if sub == "" {
+		sub = "default"
+	}
+
+	wfName := body.WorkflowName
+	if wfName == "" {
+		wfName = "Manual FastCDC Stream"
+	}
+
+	res, err := cdc.RunCDCWorkflow(sub, wfName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("FastCDC execution failed: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("FastCDC streaming run completed successfully for tenant '%s'.", sub),
+		"cdc":     res,
+	})
+}
+
 
 // GetWorkflows handles GET /api/v1/workflows
 // Returns deployed workflows for the tenant.

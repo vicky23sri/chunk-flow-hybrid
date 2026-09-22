@@ -136,16 +136,6 @@ func Decrypt(encoded string) (string, error) {
 		}
 	}
 
-	// Log warning if payload looked like base64 ciphertext but no candidate key succeeded
-	if len(ciphertext) >= 16 {
-		snip := encoded
-		if len(snip) > 20 {
-			snip = snip[:20] + "..."
-		}
-		errMsg := fmt.Sprintf("Failed to decrypt base64 payload (len=%d, snippet='%s'): tested %d candidate keys, none authenticated GCM payload.", len(encoded), snip, len(candidateKeys))
-		logger.WriteCryptoLog("DECRYPT", "WARN", errMsg)
-	}
-
-	// Decryption failed with all candidate keys (e.g. legacy plaintext string stored in DB)
+	// Return original string gracefully if it's plaintext legacy data
 	return encoded, nil
 }

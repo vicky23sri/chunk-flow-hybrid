@@ -35,18 +35,18 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
   const initial = subdomain?.[0]?.toUpperCase() || '?';
 
   return (
-    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-indigo-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-[#f95716] selection:text-white relative overflow-hidden">
       {/* Background Decorative Soft Orbs */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-200/40 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[400px] h-[300px] bg-purple-200/40 blur-[100px] rounded-full pointer-events-none" />
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-200/40 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[400px] h-[300px] bg-amber-200/40 blur-[100px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
         
-        {/* Left branding panel — Crisp Light Indigo Gradient */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
+        {/* Left branding panel — Crisp Orange Gradient */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-[#f95716] via-orange-600 to-amber-700 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
           {/* Subtle overlay shapes */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-xs font-semibold mb-6">
@@ -60,11 +60,11 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
               </div>
               <div>
                 <h1 className="text-2xl font-black text-white capitalize">{subdomain}</h1>
-                <p className="text-xs text-indigo-200 font-mono">{subdomain}.localhost</p>
+                <p className="text-xs text-orange-200 font-mono">{subdomain}.localhost</p>
               </div>
             </div>
 
-            <p className="text-indigo-100 text-xs leading-relaxed mb-6">
+            <p className="text-orange-100 text-xs leading-relaxed mb-6">
               Dedicated multi-tenant workspace with physical database isolation.
             </p>
 
@@ -74,7 +74,7 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
                   <Database size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-indigo-200 font-medium">Isolated Database</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Isolated Database</div>
                   <div className="text-xs font-mono font-bold text-white">chunkflow_tenant_{subdomain}</div>
                 </div>
               </div>
@@ -84,14 +84,14 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
                   <Globe size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-indigo-200 font-medium">Domain Context</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Domain Context</div>
                   <div className="text-xs font-mono font-bold text-white">{subdomain}.localhost:5173</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-indigo-200 flex items-center justify-between mt-6">
+          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-orange-200 flex items-center justify-between mt-6">
             <span>Data Boundary</span>
             <span className="font-semibold text-white flex items-center gap-1">
               <ShieldCheck size={13} className="text-emerald-300" /> 100% Isolated
@@ -104,7 +104,7 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
           <div className="mb-6">
             <h2 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">Workspace Sign In</h2>
             <p className="text-xs text-slate-500">
-              Sign in to access your <strong className="text-indigo-600 font-semibold">{subdomain}</strong> workspace.
+              Sign in to access your <strong className="text-[#f95716] font-semibold">{subdomain}</strong> workspace.
             </p>
           </div>
 
@@ -125,7 +125,7 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
                   type="email"
                   autoComplete="email"
                   autoFocus
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="user@company.com"
@@ -142,7 +142,7 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
                   id="tenant-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-11 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-11 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -158,17 +158,17 @@ function TenantDomainLogin({ subdomain, onSuccess }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-indigo-50/70 border border-indigo-100 rounded-xl px-3.5 py-2.5">
-              <Lock size={13} className="text-indigo-500 shrink-0" />
-              <span className="text-xs text-indigo-700 font-medium">
-                Domain locked to <strong className="font-mono text-indigo-900">{subdomain}.localhost</strong>
+            <div className="flex items-center gap-2 bg-orange-50/70 border border-orange-100 rounded-xl px-3.5 py-2.5">
+              <Lock size={13} className="text-orange-500 shrink-0" />
+              <span className="text-xs text-orange-700 font-medium">
+                Domain locked to <strong className="font-mono text-orange-900">{subdomain}.localhost</strong>
               </span>
             </div>
 
             <button
               id="tenant-login-btn"
               type="submit"
-              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-105 shadow-md shadow-indigo-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
+              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-[#f95716] to-orange-600 hover:brightness-105 shadow-md shadow-orange-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
               disabled={loading}
             >
               {loading ? (
@@ -226,33 +226,33 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
   };
 
   return (
-    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-purple-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-[calc(100vh-130px)] flex items-center justify-center p-4 sm:p-8 bg-slate-50/70 selection:bg-orange-500 selection:text-white relative overflow-hidden">
       {/* Background Soft Glow Orbs */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-purple-200/50 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[450px] h-[350px] bg-indigo-200/50 blur-[110px] rounded-full pointer-events-none" />
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-orange-200/50 blur-[130px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[450px] h-[350px] bg-amber-200/50 blur-[110px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
         
-        {/* Left side: Premium Control Center Feature Showcase — Light Purple/Indigo Gradient */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-purple-700 via-indigo-700 to-slate-900 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
+        {/* Left side: Premium Control Center Feature Showcase — Light Orange/Amber Gradient */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-[#f95716] via-orange-600 to-slate-900 text-white p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
           {/* Decorative Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-xs font-semibold mb-6">
-              <Crown size={14} className="text-yellow-300" />
+              <Crown size={14} className="text-amber-300" />
               <span>Central Control Board</span>
             </div>
 
             <h1 className="text-2xl font-black text-white leading-tight mb-3 tracking-tight">
               Multi-Tenant<br />
-              <span className="text-yellow-300">
+              <span className="text-amber-300">
                 System Operations
               </span>
             </h1>
 
-            <p className="text-purple-100 text-xs leading-relaxed mb-6">
+            <p className="text-orange-100 text-xs leading-relaxed mb-6">
               Root administrative control for tenant database provisioning, domain mappings, and system operations.
             </p>
 
@@ -262,7 +262,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
                   <Database size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-purple-200 font-medium">Central DB Target</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Central DB Target</div>
                   <div className="text-xs font-mono font-bold text-white">chunkflow_central</div>
                 </div>
               </div>
@@ -272,7 +272,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
                   <Globe size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-purple-200 font-medium">Tenancy Strategy</div>
+                  <div className="text-[10px] text-orange-200 font-medium">Tenancy Strategy</div>
                   <div className="text-xs font-mono font-bold text-white">Domain-Based (Stancl)</div>
                 </div>
               </div>
@@ -282,7 +282,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
                   <Server size={16} />
                 </div>
                 <div>
-                  <div className="text-[10px] text-purple-200 font-medium">System Telemetry</div>
+                  <div className="text-[10px] text-orange-200 font-medium">System Telemetry</div>
                   <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     All Systems Operational
@@ -292,9 +292,9 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
             </div>
           </div>
 
-          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-purple-200 flex items-center justify-between mt-6">
+          <div className="relative z-10 pt-6 border-t border-white/20 text-[11px] text-orange-200 flex items-center justify-between mt-6">
             <span>System Privileges</span>
-            <span className="font-mono text-[10px] text-yellow-300 font-bold px-2.5 py-0.5 rounded bg-white/15 border border-white/20">
+            <span className="font-mono text-[10px] text-amber-300 font-bold px-2.5 py-0.5 rounded bg-white/15 border border-white/20">
               SUPER_ADMIN
             </span>
           </div>
@@ -314,8 +314,8 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
           )}
 
           <div className="mb-6">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-[11px] font-bold mb-3">
-              <Crown size={12} className="text-purple-600" /> Super Admin Access
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#f95716] text-[11px] font-bold mb-3">
+              <Crown size={12} className="text-[#f95716]" /> Super Admin Access
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">Super Admin Sign In</h2>
             <p className="text-xs text-slate-500">
@@ -340,7 +340,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
                   type="email"
                   autoComplete="email"
                   autoFocus
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@chunkflow.com"
@@ -357,7 +357,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
                   id="admin-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-11 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-xs"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-11 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-xs"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -379,7 +379,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
               <button
                 type="button"
                 onClick={handleQuickFillAdmin}
-                className="text-purple-600 hover:text-purple-700 font-semibold cursor-pointer underline flex items-center gap-1 bg-transparent border-0 text-[11px]"
+                className="text-orange-600 hover:text-orange-700 font-semibold cursor-pointer underline flex items-center gap-1 bg-transparent border-0 text-[11px]"
               >
                 <Sparkles size={12} /> Auto-fill Admin
               </button>
@@ -389,7 +389,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
               id="admin-login-btn"
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:brightness-105 shadow-md shadow-purple-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
+              className="w-full py-3 px-4 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-[#f95716] via-orange-600 to-amber-600 hover:brightness-105 shadow-md shadow-orange-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-1"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -407,7 +407,7 @@ function CentralLogin({ onSuperAdminSuccess, onNavigateHome, initialEmail, initi
 
           <div className="mt-6 pt-5 border-t border-slate-100 text-center">
             <p className="text-[11px] text-slate-500">
-              Target Central DB: <code className="font-mono text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded font-semibold">chunkflow_central</code>
+              Target Central DB: <code className="font-mono text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded font-semibold">chunkflow_central</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-1">
               Tenant users sign in at their domain (e.g. <span className="font-mono text-slate-600">willsparrow.localhost:5173</span>)
