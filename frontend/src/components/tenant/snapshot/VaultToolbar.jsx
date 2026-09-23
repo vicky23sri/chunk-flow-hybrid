@@ -13,7 +13,7 @@ export default function VaultToolbar({
   return (
     <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-5 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
       {/* Tab Filter Pills */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-bold text-slate-500 font-mono uppercase tracking-wider mr-1">Vault View:</span>
         <button
           onClick={() => onSelectTab('all')}
@@ -35,7 +35,7 @@ export default function VaultToolbar({
         >
           Deployed Live Streams
         </button>
-      </div>
+      </div> */}
 
       {/* Search Box */}
       <div className="flex items-center gap-3 w-full sm:w-auto">

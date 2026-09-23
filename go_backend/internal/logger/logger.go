@@ -76,6 +76,30 @@ func WriteTenantConfigDetailLog(opAction, subdomain, configType, recordID, detai
 	log.Print(entry)
 }
 
+// WriteEncryptionAuditLog logs step-by-step raw JSON, AES-256 base64 ciphertext, and decrypted plaintext JSON to logs/tenant_configs.log
+func WriteEncryptionAuditLog(subdomain, action, configID, connectorID, rawSourceJSON, encSourceBase64, rawDestJSON, encDestBase64 string) {
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/tenant_configs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("[LOG_ERR] Failed to open tenant_configs.log: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	var entry string
+	if action == "SAVE_ENCRYPT" {
+		entry = fmt.Sprintf("[%s] [TENANT_CONFIG_ENCRYPT_SAVE] SUBDOMAIN=%s CONNECTOR_ID=%s CONFIG_ID=%s\n  - RAW_SOURCE_JSON: %s\n  - ENCRYPTED_SOURCE_BASE64: %s\n  - RAW_DEST_JSON: %s\n  - ENCRYPTED_DEST_BASE64: %s\n",
+			timestamp, subdomain, connectorID, configID, rawSourceJSON, encSourceBase64, rawDestJSON, encDestBase64)
+	} else {
+		entry = fmt.Sprintf("[%s] [TENANT_CONFIG_FETCH_DECRYPT] SUBDOMAIN=%s CONNECTOR_ID=%s CONFIG_ID=%s\n  - READ_ENCRYPTED_SOURCE_BASE64: %s\n  - DECRYPTED_SOURCE_JSON: %s\n  - READ_ENCRYPTED_DEST_BASE64: %s\n  - DECRYPTED_DEST_JSON: %s\n",
+			timestamp, subdomain, connectorID, configID, encSourceBase64, rawSourceJSON, encDestBase64, rawDestJSON)
+	}
+
+	logFile.WriteString(entry)
+	log.Print(entry)
+}
+
 
 // WriteCryptoLog logs crypto events, key mismatches, and failures to logs/crypto.log and stdout.
 func WriteCryptoLog(operation, status, errDetail string) {

@@ -1,5 +1,31 @@
 import React from 'react';
-import { Database, Cloud, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { Database, Cloud, Zap, Server, Globe, HardDrive, Layers, Sparkles, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+
+const ICON_MAP = {
+  postgres: Database,
+  mysql: Database,
+  kafka: Zap,
+  mongodb: Server,
+  webhook: Globe,
+  s3: Cloud,
+  gcs: Cloud,
+  redis: HardDrive,
+  snowflake: Layers,
+  pinecone: Sparkles,
+};
+
+const COLOR_BG_MAP = {
+  postgres: 'bg-blue-600',
+  gcs: 'bg-blue-600',
+  s3: 'bg-emerald-600',
+  mongodb: 'bg-emerald-600',
+  kafka: 'bg-purple-600',
+  pinecone: 'bg-purple-600',
+  mysql: 'bg-indigo-600',
+  redis: 'bg-rose-600',
+  snowflake: 'bg-cyan-600',
+  webhook: 'bg-amber-600',
+};
 
 export default function WorkflowNodeCard({
   node,
@@ -10,13 +36,17 @@ export default function WorkflowNodeCard({
   onDeleteNode,
 }) {
   const isSource = node.type === 'source';
-  const isPostgres = node.subtype === 'postgres';
+  const IconComp = ICON_MAP[node.subtype] || (isSource ? Database : Cloud);
+  const iconBgClass = COLOR_BG_MAP[node.subtype] || (isSource ? 'bg-blue-600' : 'bg-emerald-600');
+
+  const nodeX = Number(node.x || 0);
+  const nodeY = Number(node.y || 0);
 
   return (
     <div
       onMouseDown={(e) => onNodeMouseDown(e, node.id)}
       onTouchStart={(e) => onNodeMouseDown(e, node.id)}
-      style={{ left: `${node.x}px`, top: `${node.y}px` }}
+      style={{ left: `${nodeX}px`, top: `${nodeY}px` }}
       className={`absolute w-64 h-[110px] p-3 rounded-xl bg-white border transition-all duration-150 cursor-move shadow-sm hover:shadow-md flex flex-col justify-between select-none pointer-events-auto ${
         isSelected
           ? 'border-[#f95716] ring-2 ring-orange-500/20 shadow-md z-30'
@@ -30,8 +60,8 @@ export default function WorkflowNodeCard({
             e.stopPropagation();
             onPortClick(node);
           }}
-          className={`port-dot absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-emerald-500 text-emerald-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-110 transition-transform z-40 ${
-            connectingSourceId ? 'ring-4 ring-emerald-400/50 animate-bounce' : ''
+          className={`port-dot absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-emerald-500 text-emerald-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-125 transition-transform z-40 ${
+            connectingSourceId ? 'ring-4 ring-emerald-400/80 animate-bounce' : ''
           }`}
           title="Input Port: Click to connect wire here"
         >
@@ -46,8 +76,8 @@ export default function WorkflowNodeCard({
             e.stopPropagation();
             onPortClick(node);
           }}
-          className={`port-dot absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-blue-600 text-blue-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-110 transition-transform z-40 ${
-            connectingSourceId === node.id ? 'ring-4 ring-blue-400/50 animate-pulse' : ''
+          className={`port-dot absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 bg-white border-blue-600 text-blue-600 flex items-center justify-center cursor-pointer shadow-sm hover:scale-125 transition-transform z-40 ${
+            connectingSourceId === node.id ? 'ring-4 ring-blue-400/80 animate-pulse' : ''
           }`}
           title="Output Port: Click to start wire from here"
         >
@@ -58,12 +88,8 @@ export default function WorkflowNodeCard({
       {/* Compact Main Content Row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white font-bold shadow-xs ${
-              isPostgres ? 'bg-blue-600' : 'bg-emerald-600'
-            }`}
-          >
-            {isPostgres ? <Database size={16} /> : <Cloud size={16} />}
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white font-bold shadow-xs ${iconBgClass}`}>
+            <IconComp size={16} />
           </div>
 
           <div className="min-w-0">
@@ -113,3 +139,4 @@ export default function WorkflowNodeCard({
     </div>
   );
 }
+

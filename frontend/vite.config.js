@@ -9,5 +9,11 @@ export default defineConfig({
     port: 5173,
     cors: true,
     allowedHosts: true,
+    proxy: {
+      '/api/v1': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
 });

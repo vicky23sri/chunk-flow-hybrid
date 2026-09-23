@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { getSavedPostgresConfig, savePostgresConfig, getSavedS3Config, saveS3Config } from '../services/connectionStorage';
+import { savePostgresConfig, saveS3Config } from '../services/connectionStorage';
+import { showSuccess, showWarning } from '../utils/toast';
 
 export function useWorkflowCanvas(tenant) {
   const [nodes, setNodes] = useState([]);
@@ -7,14 +8,14 @@ export function useWorkflowCanvas(tenant) {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [connectingSourceId, setConnectingSourceId] = useState(null);
   const [draggingNodeId, setDraggingNodeId] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const canvasRef = useRef(null);
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
   // Drag & Drop Handlers from Sidebar onto Canvas
-  const handleDragStartFromSidebar = (e, type, subtype) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype }));
+  const handleDragStartFromSidebar = (e, type, subtype, nodeKey) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype, nodeKey }));
   };
 
   const handleDragOverCanvas = (e) => {
@@ -34,13 +35,35 @@ export function useWorkflowCanvas(tenant) {
       const dropX = Math.max(20, Math.min(e.clientX - canvasRect.left - 110, canvasRect.width - 240));
       const dropY = Math.max(20, Math.min(e.clientY - canvasRect.top - 50, canvasRect.height - 200));
 
-      createNode(data.type, data.subtype, dropX, dropY);
+      createNode(data.type, data.subtype, data.nodeKey, dropX, dropY);
     } catch (err) {
       console.error('Failed to create node on drop:', err);
     }
   };
 
-  const createNode = (type, subtype, targetX = null, targetY = null) => {
+  /**
+   * Flexible createNode supporting multiple argument patterns:
+   *  - createNode(type, subtype)
+   *  - createNode(type, subtype, nodeKey)
+   *  - createNode(type, subtype, targetX, targetY)
+   *  - createNode(type, subtype, nodeKey, targetX, targetY)
+   */
+  const createNode = (type, subtype, arg3 = null, arg4 = null, arg5 = null) => {
+    let nodeKey = null;
+    let targetX = null;
+    let targetY = null;
+
+    if (typeof arg3 === 'number') {
+      targetX = arg3;
+      targetY = typeof arg4 === 'number' ? arg4 : null;
+    } else if (typeof arg3 === 'string') {
+      nodeKey = arg3;
+      if (typeof arg4 === 'number') {
+        targetX = arg4;
+        targetY = typeof arg5 === 'number' ? arg5 : null;
+      }
+    }
+
     const id = `node_${type}_${Date.now()}`;
 
     let defaultX = type === 'source' ? 60 : 440;
@@ -52,36 +75,67 @@ export function useWorkflowCanvas(tenant) {
       defaultY += sameTypeCount * 40;
     }
 
-    const finalX = targetX !== null ? targetX : defaultX;
-    const finalY = targetY !== null ? targetY : defaultY;
+    const finalX = typeof targetX === 'number' ? Math.round(targetX) : defaultX;
+    const finalY = typeof targetY === 'number' ? Math.round(targetY) : defaultY;
 
-    let newNode = {
+    // Helper title, subtitle & config per subtype
+    let title = `${subtype.toUpperCase()} ${type === 'source' ? 'Source' : 'Destination'}`;
+    let subtitle = 'Enter details...';
+    let config = { name: '' };
+
+    if (subtype === 'postgres') {
+      title = 'Database Source (PostgreSQL)';
+      subtitle = 'Enter database details...';
+      config = { name: '', host: '', port: '5432', database: '', username: '', password: '', useSSL: false, backupSchedule: '', retentionDays: '' };
+    } else if (subtype === 'mysql') {
+      title = 'MySQL Database Source';
+      subtitle = 'Enter MySQL details...';
+      config = { name: '', host: '', port: '3306', database: '', username: '', password: '' };
+    } else if (subtype === 'kafka') {
+      title = 'Apache Kafka Stream';
+      subtitle = 'bootstrap:9092';
+      config = { name: '', bootstrapServers: '', topic: '', groupId: '', saslPassword: '' };
+    } else if (subtype === 'mongodb') {
+      title = 'MongoDB Document Store';
+      subtitle = 'Enter MongoDB URI...';
+      config = { name: '', connectionString: '', database: '', collection: '' };
+    } else if (subtype === 'webhook') {
+      title = 'HTTP Webhook Trigger';
+      subtitle = '/api/v1/webhooks';
+      config = { name: '', endpointUrl: '', secretToken: '' };
+    } else if (subtype === 's3') {
+      title = 'Amazon S3 Vault';
+      subtitle = 's3://vault/';
+      config = { name: '', bucketName: '', region: 'us-east-1', accessKeyId: '', secretAccessKey: '', folderPath: '' };
+    } else if (subtype === 'gcs') {
+      title = 'Google Cloud Storage (GCS)';
+      subtitle = 'gs://bucket/';
+      config = { name: '', bucketName: '', projectId: '', serviceAccountJson: '' };
+    } else if (subtype === 'redis') {
+      title = 'Redis Cache Vault';
+      subtitle = 'redis:6379';
+      config = { name: '', host: '', port: '6379', password: '' };
+    } else if (subtype === 'snowflake') {
+      title = 'Snowflake Data Warehouse';
+      subtitle = 'Enter account ID...';
+      config = { name: '', account: '', username: '', password: '', warehouse: '', database: '' };
+    } else if (subtype === 'pinecone') {
+      title = 'Pinecone Vector DB';
+      subtitle = 'Enter index name...';
+      config = { name: '', environment: '', indexName: '', apiKey: '' };
+    }
+
+    const newNode = {
       id,
+      nodeKey: nodeKey || `${subtype}_${type}`,
       type,
       subtype,
       x: finalX,
       y: finalY,
       isValid: false,
-      title: subtype === 'postgres' ? 'Database Source' : 'Amazon S3 Vault Destination',
-      subtitle: subtype === 'postgres' ? 'Enter database details...' : 'Enter S3 vault details...',
-      config: subtype === 'postgres' ? {
-        name: '',
-        host: '',
-        port: '',
-        database: '',
-        username: '',
-        password: '',
-        useSSL: false,
-        backupSchedule: '',
-        retentionDays: '',
-      } : {
-        name: '',
-        bucketName: '',
-        region: '',
-        accessKeyId: '',
-        secretAccessKey: '',
-        folderPath: '',
-      },
+      title,
+      subtitle,
+      config,
     };
 
     setNodes((prev) => [...prev, newNode]);
@@ -102,7 +156,6 @@ export function useWorkflowCanvas(tenant) {
     e.preventDefault();
 
     setSelectedNodeId(nodeId);
-    setDraggingNodeId(nodeId);
 
     const node = nodes.find((n) => n.id === nodeId);
     if (!node || !canvasRef.current) return;
@@ -111,10 +164,13 @@ export function useWorkflowCanvas(tenant) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    setDragOffset({
-      x: clientX - canvasRect.left - node.x,
-      y: clientY - canvasRect.top - node.y,
-    });
+    const offset = {
+      x: clientX - canvasRect.left - Number(node.x || 0),
+      y: clientY - canvasRect.top - Number(node.y || 0),
+    };
+
+    dragOffsetRef.current = offset;
+    setDraggingNodeId(nodeId);
   };
 
   useEffect(() => {
@@ -126,14 +182,14 @@ export function useWorkflowCanvas(tenant) {
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
       const canvasRect = canvasRef.current.getBoundingClientRect();
-      let newX = clientX - canvasRect.left - dragOffset.x;
-      let newY = clientY - canvasRect.top - dragOffset.y;
+      let newX = clientX - canvasRect.left - dragOffsetRef.current.x;
+      let newY = clientY - canvasRect.top - dragOffsetRef.current.y;
 
-      newX = Math.max(10, Math.min(newX, canvasRect.width - 235));
-      newY = Math.max(10, Math.min(newY, canvasRect.height - 140));
+      newX = Math.max(10, Math.min(newX, canvasRect.width - 240));
+      newY = Math.max(10, Math.min(newY, canvasRect.height - 120));
 
       setNodes((prev) =>
-        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n))
+        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: Math.round(newX), y: Math.round(newY) } : n))
       );
     };
 
@@ -152,15 +208,25 @@ export function useWorkflowCanvas(tenant) {
       window.removeEventListener('touchmove', handleWindowMove);
       window.removeEventListener('touchend', handleWindowEnd);
     };
-  }, [draggingNodeId, dragOffset]);
+  }, [draggingNodeId]);
 
   const handlePortClick = (node) => {
     if (node.type === 'source') {
       setConnectingSourceId(node.id);
-    } else if (node.type === 'destination' && connectingSourceId) {
+      showSuccess(`Selected "${node.config?.name || node.title}" as source port. Now click Green dot on Destination!`, 'Source Port Selected');
+    } else if (node.type === 'destination') {
+      if (!connectingSourceId) {
+        showWarning('Please click the Blue Output Dot on a Source node first, then click this Green Input Dot.', 'Connect Wire');
+        return;
+      }
+
+      if (connectingSourceId === node.id) return;
+
       const exists = connections.some((c) => c.sourceId === connectingSourceId && c.targetId === node.id);
-      if (!exists && connectingSourceId !== node.id) {
-        setConnections((prev) => [...prev, { id: `conn_${Date.now()}`, sourceId: connectingSourceId, targetId: node.id }]);
+      if (!exists) {
+        const newConn = { id: `conn_${Date.now()}`, sourceId: connectingSourceId, targetId: node.id };
+        setConnections((prev) => [...prev, newConn]);
+        showSuccess('Connection wire established between Source and Destination!', 'Wire Connected');
       }
       setConnectingSourceId(null);
     }
@@ -176,15 +242,13 @@ export function useWorkflowCanvas(tenant) {
           let updatedSubtitle = node.subtitle;
           let updatedTitle = node.title;
 
-          if (key === 'name') {
-            updatedTitle = value || (node.subtype === 'postgres' ? 'Database Source' : 'Amazon S3 Vault Destination');
+          if (key === 'name' && value) {
+            updatedTitle = value;
           }
 
           if (node.subtype === 'postgres') {
             savePostgresConfig(updatedConfig);
-            if (key === 'database') {
-              updatedSubtitle = value || 'Enter database name...';
-            }
+            if (key === 'database') updatedSubtitle = value || 'Enter database name...';
           } else if (node.subtype === 's3') {
             saveS3Config(updatedConfig);
             if (key === 'bucketName' || key === 'folderPath') {
@@ -228,3 +292,4 @@ export function useWorkflowCanvas(tenant) {
     handleUpdateConfig,
   };
 }
+

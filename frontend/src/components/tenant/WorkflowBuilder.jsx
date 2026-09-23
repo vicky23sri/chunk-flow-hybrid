@@ -51,11 +51,11 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
     let isSubscribed = true;
 
     async function loadCanvasData() {
-      // 1. If an explicit workflow was selected (e.g. Open Canvas from Vault)
-      if (initialWorkflow) {
-        let loadedNodes = [];
-        let loadedConns = [];
+      // 1. If an explicit workflow/connector was selected (e.g. Open Canvas from Vault) or loading default pipeline
+      let loadedNodes = [];
+      let loadedConns = [];
 
+      if (initialWorkflow) {
         try {
           if (Array.isArray(initialWorkflow.nodes_data)) {
             loadedNodes = initialWorkflow.nodes_data;
@@ -108,54 +108,95 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
             showSuccess(`Loaded pipeline canvas for "${initialWorkflow.name || 'Workflow Pipeline'}"!`, 'Workflow Canvas Loaded');
           }
           return;
-        } else {
-          // Construct nodes from initialWorkflow metadata
-          const pgId = `node_source_${Date.now()}`;
-          const s3Id = `node_destination_${Date.now() + 1}`;
-          const defaultPgNode = {
-            id: pgId,
-            type: 'source',
-            subtype: 'postgres',
-            x: 80,
-            y: 160,
-            isValid: true,
-            title: initialWorkflow.source_name || 'Source Database',
-            subtitle: `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
-            config: {
-              name: initialWorkflow.source_name || '',
-              host: '',
-              port: '',
-              database: `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
-              username: '',
-              password: '',
-            },
-          };
-          const defaultS3Node = {
-            id: s3Id,
-            type: 'destination',
-            subtype: 's3',
-            x: 460,
-            y: 160,
-            isValid: true,
-            title: initialWorkflow.destination_name || 'S3 Destination',
-            subtitle: 's3://vault/',
-            config: {
-              name: initialWorkflow.destination_name || '',
-              bucketName: '',
-              folderPath: '',
-            },
-          };
-          if (isSubscribed) {
-            setNodes([defaultPgNode, defaultS3Node]);
-            setConnections([{ id: `conn_${Date.now()}`, sourceId: pgId, targetId: s3Id }]);
-            setSelectedNodeId(pgId);
-            showSuccess(`Loaded canvas for "${initialWorkflow.name || 'Snapshot Pipeline'}"!`, 'Pipeline Loaded');
-          }
-          return;
         }
       }
 
-      // 2. If initialWorkflow is null, show a clean empty canvas for creating a new workflow
+      // Fetch saved decrypted configurations for this connector / tenant
+      let savedCfg = null;
+      try {
+        const cfgRes = await api.getConfigurations();
+        if (cfgRes && Array.isArray(cfgRes.data) && cfgRes.data.length > 0) {
+          if (initialWorkflow?.id) {
+            savedCfg = cfgRes.data.find((c) => c.connector_id === initialWorkflow.id);
+          } else {
+            savedCfg = cfgRes.data[0];
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch saved configuration:', e);
+      }
+
+      if (savedCfg && isSubscribed) {
+        const pgId = `node_source_${Date.now()}`;
+        const s3Id = `node_destination_${Date.now() + 1}`;
+
+        const srcData = savedCfg.source_data || {};
+        const destData = savedCfg.destination_data || {};
+
+        const srcSubtype = savedCfg.source_type?.sub_type || 'postgres';
+        const destSubtype = savedCfg.destination_type?.sub_type || 's3';
+
+        const srcTitle = srcData.name || savedCfg.source_type?.name || 'Source Database';
+        const srcSub = srcData.database || srcData.database_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`;
+
+        const destTitle = destData.name || savedCfg.destination_type?.name || 'Amazon S3 Vault';
+        const destBucket = destData.bucketName || destData.bucket_name || '';
+        const destPath = destData.folderPath || destData.folder_path || '';
+        const destSub = destBucket ? `s3://${destBucket}${destPath}` : 's3://vault/';
+
+        const loadedPgNode = {
+          id: pgId,
+          type: 'source',
+          subtype: srcSubtype,
+          x: 80,
+          y: 160,
+          isValid: true,
+          title: srcTitle,
+          subtitle: srcSub,
+          config: {
+            name: srcData.name || '',
+            host: srcData.host || 'localhost',
+            port: srcData.port || '5432',
+            database: srcData.database || srcData.database_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`,
+            username: srcData.username || '',
+            password: srcData.password || '',
+            useSSL: srcData.useSSL ?? srcData.use_ssl ?? false,
+            backupSchedule: srcData.backupSchedule || srcData.backup_schedule || '',
+            retentionDays: srcData.retentionDays || srcData.retention_days || '',
+            ...srcData,
+          },
+        };
+
+        const loadedS3Node = {
+          id: s3Id,
+          type: 'destination',
+          subtype: destSubtype,
+          x: 460,
+          y: 160,
+          isValid: true,
+          title: destTitle,
+          subtitle: destSub,
+          config: {
+            name: destData.name || '',
+            bucketName: destBucket,
+            region: destData.region || 'us-east-1',
+            accessKeyId: destData.accessKeyId || destData.access_key_id || '',
+            secretAccessKey: destData.secretAccessKey || destData.secret_access_key || '',
+            folderPath: destPath,
+            encryption: destData.encryption || 'AES-256 Server-Side Encryption',
+            storageClass: destData.storage_class || destData.storageClass || 'Standard',
+            ...destData,
+          },
+        };
+
+        setNodes([loadedPgNode, loadedS3Node]);
+        setConnections([{ id: `conn_${Date.now()}`, sourceId: pgId, targetId: s3Id }]);
+        setSelectedNodeId(pgId);
+        showSuccess(`Loaded canvas and populated decrypted configuration for "${savedCfg.name || initialWorkflow?.name || 'Connector Pipeline'}"!`, 'Pipeline Loaded');
+        return;
+      }
+
+      // If initialWorkflow and savedCfg are both null, show clean empty canvas
       if (!isSubscribed) return;
       setNodes([]);
       setConnections([]);
@@ -340,6 +381,7 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
         connections={connections}
         onClearCanvas={() => setShowClearConfirmModal(true)}
         onDeploy={handleDeploy}
+        initialWorkflow={initialWorkflow}
       />
 
       {/* 2. Main Workspace 3 Columns */}

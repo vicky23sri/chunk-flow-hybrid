@@ -379,6 +379,62 @@ export const api = {
       throw err;
     }
   },
+  // ─── Go Backend: Connectors & Configurations (4-table Architecture) ─────
+  getConnectors: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/connectors?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: { 'X-Tenant-Subdomain': subdomain },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, data: data.data || [] };
+    } catch (err) {
+      return { success: false, data: [] };
+    }
+  },
+
+  createConnector: async (name) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/connectors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': subdomain },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, ...data };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  },
+
+  getConfigurations: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/configurations?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: { 'X-Tenant-Subdomain': subdomain },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, data: data.data || [] };
+    } catch (err) {
+      return { success: false, data: [] };
+    }
+  },
+
+  saveConfiguration: async (payload) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/configurations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': subdomain },
+        body: JSON.stringify({ subdomain, ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, ...data };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  },
 };
 
 // Named exports for convenient direct importing
@@ -390,5 +446,9 @@ export const testDBConnection = (...args) => api.testDBConnection(...args);
 export const listSnapshots = (...args) => api.listSnapshots(...args);
 export const getChunkSize = (...args) => api.getChunkSize(...args);
 export const downloadSnapshot = (...args) => api.downloadSnapshot(...args);
+export const getConnectors = (...args) => api.getConnectors(...args);
+export const createConnector = (...args) => api.createConnector(...args);
+export const getConfigurations = (...args) => api.getConfigurations(...args);
+export const saveConfiguration = (...args) => api.saveConfiguration(...args);
 
 

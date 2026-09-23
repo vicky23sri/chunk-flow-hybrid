@@ -58,10 +58,7 @@ func Encrypt(plaintext string) (string, error) {
 		return "", nil
 	}
 
-	// Ensure we don't double-encrypt if input is already encrypted
-	if decrypted, err := Decrypt(plaintext); err == nil && decrypted != "" && decrypted != plaintext {
-		plaintext = decrypted
-	}
+	log.Printf("[CRYPTO_ENCRYPT_START] Plaintext JSON before encryption (%d bytes): %s", len(plaintext), plaintext)
 
 	key := getEncryptionKey()
 	block, err := aes.NewCipher(key)
@@ -86,7 +83,11 @@ func Encrypt(plaintext string) (string, error) {
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	encodedResult := base64.StdEncoding.EncodeToString(ciphertext)
+
+	log.Printf("[CRYPTO_ENCRYPT_SUCCESS] AES-256-GCM Encrypted Ciphertext (Base64): %s", encodedResult)
+
+	return encodedResult, nil
 }
 
 // Decrypt decrypts a base64-encoded ciphertext (containing [nonce + ciphertext]) using AES-256-GCM.
@@ -96,14 +97,16 @@ func Decrypt(encoded string) (string, error) {
 		return "", nil
 	}
 
+	log.Printf("[CRYPTO_DECRYPT_START] Encrypted Base64 string from DB (%d bytes): %s", len(encoded), encoded)
+
 	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		// Not base64 encoded or plaintext legacy data
+		log.Printf("[CRYPTO_DECRYPT_WARN] Input is not valid base64 (returning plaintext fallback): %s", encoded)
 		return encoded, nil
 	}
 
 	candidateKeys := getCandidateKeys()
-	for idx, key := range candidateKeys {
+	for _, key := range candidateKeys {
 		block, err := aes.NewCipher(key)
 		if err != nil {
 			continue
@@ -123,19 +126,11 @@ func Decrypt(encoded string) (string, error) {
 		plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
 		if err == nil {
 			res := string(plaintext)
-			if idx > 0 {
-				log.Printf("[CRYPTO_NOTICE] Decrypted payload using candidate key index #%d", idx)
-			}
-			// Handle potential legacy double-encryption recursively
-			if res != encoded {
-				if nested, errN := Decrypt(res); errN == nil && nested != res {
-					return nested, nil
-				}
-			}
+			log.Printf("[CRYPTO_DECRYPT_SUCCESS] AES-256-GCM Decrypted Plaintext JSON (%d bytes): %s", len(res), res)
 			return res, nil
 		}
 	}
 
-	// Return original string gracefully if it's plaintext legacy data
+	log.Printf("[CRYPTO_DECRYPT_WARN] Could not decrypt with candidate keys (returning original string)")
 	return encoded, nil
 }

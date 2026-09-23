@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
         );
         $tenant->domains()->firstOrCreate(['domain' => 'acme.localhost']);
 
-        // 3. Seed admin user in tenant DB using $tenant->run()
+        // 3. Seed admin user & node catalog in tenant DB using $tenant->run()
         $tenant->run(function () {
             User::firstOrCreate(
                 ['email' => 'admin@acme.com'],
@@ -39,6 +39,8 @@ class DatabaseSeeder extends Seeder
                     'role'     => 'admin',
                 ]
             );
+
+            $this->call(NodeCatalogSeeder::class);
         });
 
         $this->command->info('✅ Seed tenant created: acme (admin@acme.com / admin123)');
