@@ -356,6 +356,8 @@ export const api = {
       return { success: res.ok && data.success !== false, message: data.message, log: data.log };
     } catch (err) {
       return { success: false, message: `Cannot reach Go Backend at ${GO_API_BASE}.` };
+    }
+  },
       
   // ─── Go Backend: List CDC snapshots from master.csv ───────────────────────
   listSnapshots: async () => {
