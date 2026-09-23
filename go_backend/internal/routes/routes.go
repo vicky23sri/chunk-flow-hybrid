@@ -7,6 +7,7 @@ import (
 	"chunkflow-backend/internal/config"
 	"chunkflow-backend/internal/handlers"
 	"chunkflow-backend/internal/middleware"
+	"chunkflow-backend/internal/scheduler"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,6 +41,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		v1.POST("/workflow/deploy", handlers.DeployWorkflow)
 		v1.POST("/workflow/trigger-cdc", handlers.TriggerCDCPipeline)
 		v1.GET("/workflows", handlers.GetWorkflows)
+		v1.GET("/scheduler/logs", scheduler.GetCronLogsHandler)
+		v1.GET("/scheduler/queue", scheduler.GetJobQueueHandler)
+		v1.GET("/scheduler/next-run", scheduler.GetNextRunHandler)
+		v1.POST("/scheduler/trigger", scheduler.PostTriggerHandler)
 
 		// FastCDC Snapshot Management Routes
 		v1.GET("/list-snapshots", handlers.ListSnapshots)

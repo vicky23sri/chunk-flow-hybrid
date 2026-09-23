@@ -94,6 +94,13 @@ func WriteCryptoLog(operation, status, errDetail string) {
 	log.Print(entry)
 }
 
+// WriteCronExecutionLog logs background cron execution events to logs/cron_executions.log and stdout.
+func WriteCronExecutionLog(subdomain, cronExp, dbName, statusMessage string) {
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/cron_executions.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("[LOG_ERR] Failed to open cron_executions.log: %v", err)
+
 // WriteFastCDCLog logs FastCDC streaming execution metrics to logs/fastcdc_stream.log and stdout.
 func WriteFastCDCLog(subdomain, workflowName string, totalBytes int64, totalChunks, uniqueChunks int, dedupRatio float64, durationMs int64, destKey, detail string) {
 	_ = os.MkdirAll("logs", 0755)
@@ -105,6 +112,10 @@ func WriteFastCDCLog(subdomain, workflowName string, totalBytes int64, totalChun
 	defer logFile.Close()
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
+
+	entry := fmt.Sprintf("[%s] [CRON_WORKER] SUBDOMAIN=%s SCHEDULE=\"%s\" DB=\"%s\" MSG=\"%s\"\n",
+		timestamp, subdomain, cronExp, dbName, statusMessage)
+  
 	entry := fmt.Sprintf("[%s] [FASTCDC_STREAM] SUBDOMAIN=%s WORKFLOW=\"%s\" TOTAL_BYTES=%d TOTAL_CHUNKS=%d UNIQUE_CHUNKS=%d DEDUP_RATIO=%.2f%% DURATION=%dms DEST=\"%s\" DETAILS=\"%s\"\n",
 		timestamp, subdomain, workflowName, totalBytes, totalChunks, uniqueChunks, dedupRatio, durationMs, destKey, detail)
 

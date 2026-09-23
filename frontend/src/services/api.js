@@ -329,6 +329,34 @@ export const api = {
     }
   },
 
+  // ─── Go Backend: Fetch real-time Cron execution logs ──────────────────────
+  getCronLogs: async () => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/scheduler/logs`);
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, logs: data.logs || [] };
+    } catch (err) {
+      return { success: false, logs: [] };
+    }
+  },
+
+  // ─── Go Backend: Trigger manual execution of a cron job ─────────────────
+  triggerCronJob: async (payload) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/scheduler/trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Subdomain': subdomain,
+        },
+        body: JSON.stringify({ subdomain, ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, message: data.message, log: data.log };
+    } catch (err) {
+      return { success: false, message: `Cannot reach Go Backend at ${GO_API_BASE}.` };
+      
   // ─── Go Backend: List CDC snapshots from master.csv ───────────────────────
   listSnapshots: async () => {
     try {
@@ -387,6 +415,8 @@ export const getWorkflows = (...args) => api.getWorkflows(...args);
 export const deployWorkflow = (...args) => api.deployWorkflow(...args);
 export const saveTenantConfig = (...args) => api.saveTenantConfig(...args);
 export const testDBConnection = (...args) => api.testDBConnection(...args);
+export const getCronLogs = (...args) => api.getCronLogs(...args);
+export const triggerCronJob = (...args) => api.triggerCronJob(...args);
 export const listSnapshots = (...args) => api.listSnapshots(...args);
 export const getChunkSize = (...args) => api.getChunkSize(...args);
 export const downloadSnapshot = (...args) => api.downloadSnapshot(...args);
