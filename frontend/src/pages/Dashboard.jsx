@@ -11,10 +11,19 @@ import {
 } from 'lucide-react';
 
 import WorkflowBuilder from '../components/tenant/WorkflowBuilder';
+import ConnectorSelectionView from '../components/tenant/workflow/ConnectorSelectionView';
 import BackupScheduler from '../components/tenant/BackupScheduler';
 import SnapshotExplorer from '../components/tenant/SnapshotExplorer';
 import SnapshotHistoryView from '../components/tenant/snapshot/SnapshotHistoryView';
 import ConnectionSettingsModal from '../components/tenant/ConnectionSettingsModal';
+
+// Overview Components
+import OverviewBanner from '../components/tenant/overview/OverviewBanner';
+import MetricCards from '../components/tenant/overview/MetricCards';
+import ActivityFeed from '../components/tenant/overview/ActivityFeed';
+import ConnectorsList from '../components/tenant/overview/ConnectorsList';
+import RecentWorkflows from '../components/tenant/overview/RecentWorkflows';
+import QuickActions from '../components/tenant/overview/QuickActions';
 
 export default function Dashboard({ user, tenant, onTenantChange }) {
   const [projects, setProjects] = useState([]);
@@ -33,7 +42,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   const handleNavigateToBuilder = (wf = null) => {
     const targetWf = (wf && typeof wf === 'object' && typeof wf.id === 'string') ? wf : null;
     setSelectedWorkflow(targetWf);
-    setActiveSection('workflow');
+    setActiveSection(targetWf ? 'workflow_canvas' : 'workflow');
   };
 
   // Sidebar Collapse / Expand State (Auto-collapsed on mobile & tablet)
@@ -65,14 +74,39 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
   }, [tenant?.id]);
 
   const [snapshotCount, setSnapshotCount] = useState(0);
+  const [connectorsCount, setConnectorsCount] = useState(0);
+  const [connectors, setConnectors] = useState([]);
+  const [cdcSnapshotsCount, setCdcSnapshotsCount] = useState(0);
+  const [allSnapshots, setAllSnapshots] = useState([]);
+  const [totalChunkSize, setTotalChunkSize] = useState('0 B');
+  const [recentWorkflows, setRecentWorkflows] = useState([]);
 
   const loadDashboardData = async (isInitial = true) => {
     if (isInitial) setLoading(true);
     setError('');
     try {
-      const wfRes = await api.getWorkflows();
+      const [wfRes, connectorsRes, cdcRes, sizeRes] = await Promise.all([
+        api.getWorkflows(),
+        api.getConnectors(),
+        api.listSnapshots(),
+        api.getChunkSize()
+      ]);
+      
       if (wfRes && Array.isArray(wfRes.workflows)) {
         setSnapshotCount(wfRes.workflows.length);
+        setRecentWorkflows(wfRes.workflows.slice(0, 5));
+      }
+      if (connectorsRes && connectorsRes.success) {
+        setConnectorsCount(connectorsRes.data?.length || 0);
+        setConnectors(connectorsRes.data || []);
+      }
+      if (Array.isArray(cdcRes)) {
+        setCdcSnapshotsCount(cdcRes.length);
+        setAllSnapshots(cdcRes);
+      }
+      if (sizeRes && sizeRes.physical_size_bytes !== undefined) {
+        const bytes = sizeRes.physical_size_bytes;
+        setTotalChunkSize(bytes > 1024*1024 ? (bytes/(1024*1024)).toFixed(2) + ' MB' : bytes + ' B');
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -154,6 +188,8 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
 
   const totalStorageMB = (documents.reduce((acc, d) => acc + (d.size_bytes || 0), 0) / 1024 / 1024).toFixed(2);
 
+  const activePipelinesCount = connectors.filter(c => c.is_configured).length;
+
   const sidebarNav = [
     {
       group: 'WORKSPACE OVERVIEW',
@@ -165,7 +201,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
     {
       group: 'BACKUP & PIPELINES',
       items: [
-        { id: 'snapshots', label: 'Backup Vault', icon: Database, badge: String(snapshotCount) },
+        { id: 'snapshots', label: 'Active Pipelines', icon: Database, badge: activePipelinesCount > 0 ? String(activePipelinesCount) : null },
         { id: 'history_snapshots', label: 'CDC Snapshots', icon: FileText, badge: 'master.csv' },
         // { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
       ],
@@ -324,111 +360,57 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
         {/* ── SECTION: OVERVIEW DASHBOARD ───────────────────────────────────── */}
         {activeSection === 'overview' && (
           <div className="space-y-6">
-            
-            {/* Main Banner */}
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-7 shadow-xs relative overflow-hidden flex flex-wrap justify-between items-center gap-6">
-              <div className="relative z-10 text-left max-w-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-3 py-0.5 rounded-full text-[11px] font-mono font-bold bg-orange-50 text-[#f95716] border border-orange-200">
-                    PHYSICAL ISOLATION ACTIVE
-                  </span>
-                  <span className="px-3 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Dedicated PostgreSQL
-                  </span>
-                </div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                  {tenant?.name || 'Tenant Workspace Dashboard'}
-                </h1>
-
-                {/* <div className="text-xs text-slate-500 font-normal flex gap-6 flex-wrap mt-3 font-mono">
-                  <span>Target DB: <code className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200 font-bold">chunkflow_tenant_{tenant?.subdomain}</code></span>
-                  <span>Tenant UUID: <code className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{tenant?.id}</code></span>
-                </div> */}
-              </div>
+            <OverviewBanner tenant={tenant} />
+            <MetricCards 
+              snapshotCount={snapshotCount}
+              connectorsCount={connectorsCount}
+              cdcSnapshotsCount={cdcSnapshotsCount}
+              totalChunkSize={totalChunkSize}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <ActivityFeed snapshots={allSnapshots} />
+              <ConnectorsList 
+                connectors={connectors} 
+                onViewAll={() => setActiveSection('workflow')} 
+                onAddConnector={() => {
+                  setActiveSection('workflow');
+                  // Give it a tick to render ConnectorSelectionView before triggering its modal if needed
+                  // Or just navigate to workflow view where they can click New Connector
+                }}
+              />
             </div>
-
-            {/* 3 Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left hover:border-orange-500/40 transition-all">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">Vault Pipelines</span>
-                  <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#f95716] flex items-center justify-center">
-                    <Database size={18} />
-                  </div>
-                </div>
-                <div className="text-3xl font-black text-slate-950 leading-none mb-2">{snapshotCount}</div>
-                <div className="text-xs text-slate-500 font-normal">
-                  Deployed backup & vault pipelines
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left hover:border-emerald-500/40 transition-all">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">Isolation Status</span>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <ShieldCheck size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-emerald-600 leading-none mb-2">100% Isolated</div>
-                <div className="text-xs text-slate-500 font-normal">
-                  Dedicated PostgreSQL DB instance
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left hover:border-amber-500/40 transition-all">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">FastCDC Engine</span>
-                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                    <Activity size={18} />
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-amber-600 leading-none mb-2">Active • 4.8x</div>
-                <div className="text-xs text-slate-500 font-normal">
-                  Variable Content-Defined Slicer
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions Shortcuts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div 
-                onClick={() => handleNavigateToBuilder(null)}
-                className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-orange-500/50 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#f95716] flex items-center justify-center border border-orange-200 shrink-0">
-                    <Projector size={24} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-base text-slate-900">Launch Workflow Builder</h3>
-                    <p className="text-xs text-slate-500">Visual database-to-storage canvas pipeline</p>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-slate-400" />
-              </div>
-
-              <div 
-                onClick={() => setActiveSection('scheduler')}
-                className="bg-white border border-slate-200 p-6 rounded-3xl hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-200 shrink-0">
-                    <Clock size={24} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-base text-slate-900">Configure Backup Scheduler</h3>
-                    <p className="text-xs text-slate-500">Cron rules and FastCDC snapshot telemetry</p>
-                  </div>
-                </div>
-                <ChevronRight size={20} className="text-slate-[#f95716]" />
-              </div>
-            </div>
-
+            <RecentWorkflows 
+              recentWorkflows={recentWorkflows} 
+              onNavSelect={handleNavSelect} 
+              onNavigateToBuilder={handleNavigateToBuilder} 
+            />
+            <QuickActions 
+              onNavigateToBuilder={handleNavigateToBuilder} 
+              onNavSelect={handleNavSelect} 
+            />
           </div>
         )}
 
-        {/* ── SECTION: WORKFLOW BUILDER ───────────────────────────────── */}
+        {/* ── SECTION: WORKFLOW BUILDER ENTRY (CONNECTOR SELECTION) ─────── */}
         {activeSection === 'workflow' && (
+          <ConnectorSelectionView 
+            connectors={connectors} 
+            onSelectConnector={(connector) => {
+              setSelectedWorkflow(connector);
+              setActiveSection('workflow_canvas');
+            }}
+            onAddConnector={(newConnector) => {
+              loadDashboardData(false);
+              if (newConnector && newConnector.id) {
+                setSelectedWorkflow(newConnector);
+                setActiveSection('workflow_canvas');
+              }
+            }}
+          />
+        )}
+
+        {/* ── SECTION: WORKFLOW CANVAS ───────────────────────────────── */}
+        {activeSection === 'workflow_canvas' && (
           <WorkflowBuilder 
             key={selectedWorkflow?.id || 'new_workflow'} 
             tenant={tenant} 

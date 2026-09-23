@@ -6,6 +6,74 @@ import {
 import PostgresConfigForm from './PostgresConfigForm';
 import S3ConfigForm from './S3ConfigForm';
 
+function GenericConfigForm({ config = {}, onChange, onTestConnection, isTesting, testResult, subtype }) {
+  const fields = Object.keys(config);
+
+  const formatLabel = (key) =>
+    key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (str) => str.toUpperCase());
+
+  return (
+    <div className="space-y-3">
+      {fields.map((key) => {
+        const isSecret = key.toLowerCase().includes('password') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('token') || key.toLowerCase().includes('key');
+        return (
+          <div key={key}>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              {formatLabel(key)}
+            </label>
+            <input
+              type={isSecret ? 'password' : 'text'}
+              value={config[key] || ''}
+              onChange={(e) => onChange(key, e.target.value)}
+              placeholder={`Enter ${formatLabel(key).toLowerCase()}...`}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#f95716] transition-all bg-slate-50/50"
+            />
+          </div>
+        );
+      })}
+
+      <div className="pt-2">
+        <button
+          onClick={onTestConnection}
+          disabled={isTesting}
+          className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          {isTesting ? (
+            <>
+              <RefreshCw size={13} className="animate-spin text-blue-600" />
+              <span>Verifying Connection...</span>
+            </>
+          ) : (
+            <>
+              <Plug size={13} className="text-[#f95716]" />
+              <span>Test Connection</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {testResult && (
+        <div
+          className={`p-2.5 rounded-xl border text-[11px] font-medium flex items-center gap-2 ${
+            testResult.success
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-rose-50 text-rose-800 border-rose-200'
+          }`}
+        >
+          {testResult.success ? (
+            <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle size={14} className="text-rose-600 shrink-0" />
+          )}
+          <span>{testResult.message}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NodeInspectorPanel({
   selectedNode,
   selectedNodeId,
@@ -49,17 +117,20 @@ export default function NodeInspectorPanel({
             <div className="flex items-center gap-3 p-2 rounded-2xl bg-slate-50 border border-slate-200 mb-2">
               <div
                 className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${
-                  selectedNode.subtype === 'postgres'
+                  selectedNode.type === 'source'
                     ? 'bg-blue-50 text-blue-600 border-blue-200'
                     : 'bg-emerald-50 text-emerald-600 border-emerald-200'
                 }`}
               >
-                {selectedNode.subtype === 'postgres' ? <Database size={14} /> : <Cloud size={14} />}
+                {selectedNode.type === 'source' ? <Database size={14} /> : <Cloud size={14} />}
               </div>
-              <div>
-                <h4 className="font-black text-sm text-slate-900 leading-snug">
-                  {selectedNode.config?.name || (selectedNode.subtype === 'postgres' ? 'Database Configuration' : 'Amazon S3 Configuration')}
+              <div className="min-w-0">
+                <h4 className="font-black text-sm text-slate-900 leading-snug truncate">
+                  {selectedNode.config?.name || selectedNode.title}
                 </h4>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">
+                  {selectedNode.subtype} {selectedNode.type}
+                </p>
               </div>
             </div>
 
@@ -88,6 +159,18 @@ export default function NodeInspectorPanel({
                 isTesting={isTestingConnection}
                 testResult={testResult}
                 errors={errors}
+              />
+            )}
+
+            {/* ── GENERIC CONFIGURATION (ALL OTHER CATALOG NODES) ────────── */}
+            {selectedNode.subtype !== 'postgres' && selectedNode.subtype !== 's3' && (
+              <GenericConfigForm
+                config={selectedNode.config || {}}
+                onChange={onUpdateConfig}
+                onTestConnection={onTestConnection}
+                isTesting={isTestingConnection}
+                testResult={testResult}
+                subtype={selectedNode.subtype}
               />
             )}
           </div>

@@ -38,6 +38,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		v1.POST("/test-db-connection", handlers.TestDBConnection)
 		v1.POST("/tenant-config", handlers.SaveTenantConfig)
 		v1.GET("/tenant-config", handlers.GetTenantConfig)
+
+		// Catalog, Connectors, & Configurations (4-table Architecture)
+		v1.GET("/configuration-types", handlers.GetConfigurationTypes)
+		v1.GET("/connectors", handlers.GetConnectors)
+		v1.POST("/connectors", handlers.CreateConnector)
+		v1.GET("/configurations", handlers.GetConfigurations)
+		v1.POST("/configurations", handlers.SaveConfiguration)
+
 		v1.POST("/workflow/deploy", handlers.DeployWorkflow)
 		v1.POST("/workflow/trigger-cdc", handlers.TriggerCDCPipeline)
 		v1.GET("/workflows", handlers.GetWorkflows)

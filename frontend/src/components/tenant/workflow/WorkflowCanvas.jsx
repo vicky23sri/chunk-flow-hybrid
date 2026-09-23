@@ -66,15 +66,20 @@ export default function WorkflowCanvas({
           const tgtNode = nodes.find((n) => n.id === conn.targetId);
           if (!srcNode || !tgtNode) return null;
 
+          const sx = Number(srcNode.x || 0);
+          const sy = Number(srcNode.y || 0);
+          const tx = Number(tgtNode.x || 0);
+          const ty = Number(tgtNode.y || 0);
+
           // Blue dot position: exact center of blue output circle at right edge of node card (w-64 = 256px, h-110 = 55px)
-          const x1 = srcNode.x + 256;
-          const y1 = srcNode.y + 55;
+          const x1 = sx + 256;
+          const y1 = sy + 55;
 
           // Green dot position: exact center of green input circle at left edge of node card
-          const x2 = tgtNode.x;
-          const y2 = tgtNode.y + 55;
+          const x2 = tx;
+          const y2 = ty + 55;
 
-          const dx = Math.abs(x2 - x1) / 2;
+          const dx = Math.max(40, Math.abs(x2 - x1) / 2);
 
           return (
             <g key={conn.id}>

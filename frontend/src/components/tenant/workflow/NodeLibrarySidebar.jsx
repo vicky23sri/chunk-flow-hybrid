@@ -1,68 +1,122 @@
-import React from 'react';
-import { Database, Cloud, Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Database, Cloud, Zap, Server, HardDrive, Layers, Globe, Sparkles, Loader2 } from 'lucide-react';
+
+const ICON_MAP = {
+  postgres: Database,
+  mysql: Database,
+  kafka: Zap,
+  mongodb: Server,
+  webhook: Globe,
+  s3: Cloud,
+  gcs: Cloud,
+  redis: HardDrive,
+  snowflake: Layers,
+  pinecone: Sparkles,
+};
+
+const COLOR_MAP = {
+  blue: { badge: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-600', text: 'group-hover:text-blue-600', border: 'hover:border-blue-500/60' },
+  emerald: { badge: 'text-emerald-600 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500', text: 'group-hover:text-emerald-600', border: 'hover:border-emerald-500/60' },
+  purple: { badge: 'text-purple-600 bg-purple-50 border-purple-200', dot: 'bg-purple-600', text: 'group-hover:text-purple-600', border: 'hover:border-purple-500/60' },
+  amber: { badge: 'text-amber-600 bg-amber-50 border-amber-200', dot: 'bg-amber-600', text: 'group-hover:text-amber-600', border: 'hover:border-amber-500/60' },
+  rose: { badge: 'text-rose-600 bg-rose-50 border-rose-200', dot: 'bg-rose-600', text: 'group-hover:text-rose-600', border: 'hover:border-rose-500/60' },
+  indigo: { badge: 'text-indigo-600 bg-indigo-50 border-indigo-200', dot: 'bg-indigo-600', text: 'group-hover:text-indigo-600', border: 'hover:border-indigo-500/60' },
+  cyan: { badge: 'text-cyan-600 bg-cyan-50 border-cyan-200', dot: 'bg-cyan-600', text: 'group-hover:text-cyan-600', border: 'hover:border-cyan-500/60' },
+};
 
 export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
+  const [nodeTypes, setNodeTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const goApiBase = import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1';
+    const sub = localStorage.getItem('tenant_subdomain') || 'willsparrow';
+    
+    fetch(`${goApiBase}/configuration-types?subdomain=${encodeURIComponent(sub)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.data)) {
+          setNodeTypes(data.data);
+        }
+      })
+      .catch((err) => console.error('Failed to load node types catalog:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sources = nodeTypes.filter((n) => n.category === 'source');
+  const destinations = nodeTypes.filter((n) => n.category === 'destination');
+
+  // Fallbacks if backend catalog is loading
+  const displaySources = sources.length > 0 ? sources : [
+    { id: '1', node_key: 'postgres_source', name: 'Database Source', category: 'source', sub_type: 'postgres', color: { name: 'blue' } },
+  ];
+  const displayDestinations = destinations.length > 0 ? destinations : [
+    { id: '2', node_key: 's3_destination', name: 'Amazon S3 Vault', category: 'destination', sub_type: 's3', color: { name: 'emerald' } },
+  ];
+
+  const renderNodeItem = (item) => {
+    const IconComp = ICON_MAP[item.sub_type] || Database;
+    const colorName = item.color?.name || (item.category === 'source' ? 'blue' : 'emerald');
+    const colors = COLOR_MAP[colorName] || COLOR_MAP.blue;
+
+    return (
+      <div
+        key={item.id || item.node_key}
+        draggable
+        onDragStart={(e) => onDragStart(e, item.category, item.sub_type, item.node_key)}
+        onClick={() => onCreateNode(item.category, item.sub_type, item.node_key)}
+        className={`p-3 rounded-2xl bg-white border border-slate-200 ${colors.border} hover:shadow-md transition-all cursor-grab active:cursor-grabbing text-left flex items-center gap-3 shadow-xs group`}
+      >
+        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${colors.badge}`}>
+          <IconComp size={16} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className={`text-xs font-bold text-slate-900 ${colors.text} transition-colors truncate`}>
+            {item.name}
+          </div>
+          <div className="text-[10px] text-slate-500 font-normal truncate uppercase tracking-wider font-mono">
+            {item.sub_type} driver
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="lg:col-span-3 col-span-12 bg-slate-50/60 p-4 sm:p-5 border-r border-b lg:border-b-0 border-slate-200/80 flex flex-col justify-between overflow-y-auto">
+    <div className="lg:col-span-3 col-span-12 bg-slate-50/60 p-4 sm:p-5 border-r border-b lg:border-b-0 border-slate-200/80 flex flex-col justify-between overflow-y-auto max-h-[calc(100vh-140px)]">
       <div className="space-y-4">
         <div>
-          <h3 className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-1">
-            Node Library
-          </h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+              Node Library
+            </h3>
+            {loading && <Loader2 size={12} className="animate-spin text-blue-600" />}
+          </div>
           <p className="text-[11px] sm:text-xs text-slate-500 leading-relaxed font-normal">
             Drag nodes onto canvas or click to add:
           </p>
         </div>
 
-        {/* Draggable Database Source Node */}
-        <div className="space-y-3">
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-blue-600 uppercase mb-1.5 flex items-center gap-1.5 tracking-tight">
-              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" /> 1. Database (Source)
-            </span>
-            <div
-              draggable
-              onDragStart={(e) => onDragStart(e, 'source', 'postgres')}
-              onClick={() => onCreateNode('source', 'postgres')}
-              className="p-3 sm:p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-blue-500/60 hover:shadow-md transition-all cursor-grab active:cursor-grabbing text-left flex items-center gap-3 shadow-xs group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                <Database size={17} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                  Database Source
-                </div>
-                <div className="text-[10px] sm:text-[11px] text-slate-500 font-normal truncate">
-                  Relational Database Connection
-                </div>
-              </div>
-            </div>
+        {/* 1. SOURCES SECTION */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-mono font-bold text-blue-600 uppercase flex items-center gap-1.5 tracking-tight">
+            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" /> 1. SOURCES ({displaySources.length})
+          </span>
+          <div className="space-y-2">
+            {displaySources.map(renderNodeItem)}
           </div>
+        </div>
 
-          {/* Draggable Amazon S3 Destination Node */}
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-emerald-600 uppercase mb-1.5 flex items-center gap-1.5 tracking-tight">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> 2. Amazon S3 (Destination)
-            </span>
-            <div
-              draggable
-              onDragStart={(e) => onDragStart(e, 'destination', 's3')}
-              onClick={() => onCreateNode('destination', 's3')}
-              className="p-3 sm:p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500/60 hover:shadow-md transition-all cursor-grab active:cursor-grabbing text-left flex items-center gap-3 shadow-xs group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
-                <Cloud size={17} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors truncate">
-                  Amazon S3 Vault
-                </div>
-                <div className="text-[10px] sm:text-[11px] text-slate-500 font-normal truncate">
-                  AWS S3 Cloud Storage
-                </div>
-              </div>
-            </div>
+        {/* 2. DESTINATIONS SECTION */}
+        <div className="space-y-2 pt-2">
+          <span className="text-[10px] font-mono font-bold text-emerald-600 uppercase flex items-center gap-1.5 tracking-tight">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> 2. DESTINATIONS ({displayDestinations.length})
+          </span>
+          <div className="space-y-2">
+            {displayDestinations.map(renderNodeItem)}
           </div>
         </div>
       </div>
@@ -73,9 +127,9 @@ export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
           <Sparkles size={14} className="text-[#f95716] shrink-0" /> Instructions:
         </div>
         <ul className="space-y-1 text-[10px] sm:text-[11px] list-disc list-inside font-normal text-slate-500 leading-snug">
-          <li>Drag or click nodes to add.</li>
-          <li>Click <strong className="text-blue-600 font-bold">Blue dot</strong> on DB, then <strong className="text-emerald-600 font-bold">Green dot</strong> on S3 to wire.</li>
-          <li>Click nodes to configure settings.</li>
+          <li>Drag or click any node to add.</li>
+          <li>Click <strong className="text-blue-600 font-bold">Blue dot</strong> on Source, then <strong className="text-emerald-600 font-bold">Green dot</strong> on Destination to wire.</li>
+          <li>Click node card to open configuration form.</li>
         </ul>
       </div>
     </div>
