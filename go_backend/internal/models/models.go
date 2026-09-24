@@ -17,45 +17,55 @@ type Connector struct {
 	IsConfigured bool   `json:"is_configured"`
 }
 
-// Color represents a visual UI theme color from colors table.
-type Color struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	HexCode   string `json:"hex_code"`
-	BgClass   string `json:"bg_class"`
-	TextClass string `json:"text_class"`
-}
-
-// ConfigurationType represents a node definition from configuration_types table.
-type ConfigurationType struct {
+// Node represents a node definition from the nodes table.
+type Node struct {
 	ID           string                   `json:"id"`
 	NodeKey      string                   `json:"node_key"`
 	Name         string                   `json:"name"`
 	Category     string                   `json:"category"`
 	SubType      string                   `json:"sub_type"`
-	ColorID      *string                  `json:"color_id,omitempty"`
-	Color        *Color                   `json:"color,omitempty"`
+	Color        map[string]interface{}   `json:"color"`
 	FieldsSchema []map[string]interface{} `json:"fields_schema"`
 	IsActive     bool                     `json:"is_active"`
 	SortOrder    int                      `json:"sort_order"`
 }
 
-// Configuration represents a pipeline configuration record from configurations table.
-type Configuration struct {
-	ID                       string                 `json:"id"`
-	ConnectorID              *string                `json:"connector_id,omitempty"`
-	SourceTypeID             *string                `json:"source_type_id,omitempty"`
-	DestinationTypeID        *string                `json:"destination_type_id,omitempty"`
-	SourceType               *ConfigurationType     `json:"source_type,omitempty"`
-	DestinationType          *ConfigurationType     `json:"destination_type,omitempty"`
-	Name                     string                 `json:"name"`
-	SourceEncryptedData      string                 `json:"source_encrypted_data,omitempty"`
-	DestinationEncryptedData string                 `json:"destination_encrypted_data,omitempty"`
-	SourceData               map[string]interface{} `json:"source_data,omitempty"`
-	DestinationData          map[string]interface{} `json:"destination_data,omitempty"`
-	IsVerified               bool                   `json:"is_verified"`
-	CreatedAt                string                 `json:"created_at,omitempty"`
-	UpdatedAt                string                 `json:"updated_at,omitempty"`
+// CanvasNode represents a node dropped onto a canvas (from canvas_nodes).
+type CanvasNode struct {
+	ID               string                 `json:"id"`
+	ConnectorID      string                 `json:"connector_id"`
+	NodeID           string                 `json:"node_id"`
+	ElementID        string                 `json:"element_id"`
+	Label            string                 `json:"label"`
+	PositionX        float64                `json:"position_x"`
+	PositionY        float64                `json:"position_y"`
+	EncryptedConfig  string                 `json:"encrypted_config,omitempty"`
+	ConfigData       map[string]interface{} `json:"config_data,omitempty"`
+	IsVerified       bool                   `json:"is_verified"`
+	CreatedAt        string                 `json:"created_at,omitempty"`
+	UpdatedAt        string                 `json:"updated_at,omitempty"`
+
+	// Node Details
+	Node *Node `json:"node,omitempty"`
+}
+
+// CanvasConnection represents a wire between node instances (from canvas_connections).
+type CanvasConnection struct {
+	ID                  string  `json:"id"`
+	ConnectorID         string  `json:"connector_id"`
+	SourceCanvasNodeID  string  `json:"source_canvas_node_id"`
+	TargetCanvasNodeID  string  `json:"target_canvas_node_id"`
+	SourceHandle        *string `json:"source_handle,omitempty"`
+	TargetHandle        *string `json:"target_handle,omitempty"`
+	CreatedAt           string  `json:"created_at,omitempty"`
+}
+
+// SaveCanvasRequest is the payload for saving an entire canvas.
+type SaveCanvasRequest struct {
+	Subdomain   string             `json:"subdomain"`
+	ConnectorID string             `json:"connector_id"`
+	Nodes       []CanvasNode       `json:"nodes"`
+	Connections []CanvasConnection `json:"connections"`
 }
 
 // SourceConfiguration represents backwards-compatible PostgreSQL source node config
@@ -95,15 +105,10 @@ type TestDBConnectionRequest struct {
 	UseSSL   bool   `json:"useSSL"`
 }
 
-// TenantConfigRequest is the request payload for POST /tenant-config.
-type TenantConfigRequest struct {
-	Subdomain                string                 `json:"subdomain"`
-	ConnectorID              string                 `json:"connector_id,omitempty"`
-	Name                     string                 `json:"name,omitempty"`
-	SourceNodeKey            string                 `json:"source_node_key,omitempty"`
-	DestinationNodeKey       string                 `json:"destination_node_key,omitempty"`
-	Postgres                 map[string]interface{} `json:"postgres"`
-	S3                       map[string]interface{} `json:"s3"`
-	SourceData               map[string]interface{} `json:"source_data,omitempty"`
-	DestinationData          map[string]interface{} `json:"destination_data,omitempty"`
+// TestS3ConnectionRequest is the request payload for POST /test-s3-connection.
+type TestS3ConnectionRequest struct {
+	AccessKeyID     string `json:"accessKeyId"`
+	SecretAccessKey string `json:"secretAccessKey"`
+	Region          string `json:"region"`
+	BucketName      string `json:"bucketName"`
 }

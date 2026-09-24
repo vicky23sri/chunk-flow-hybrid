@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, HardDrive, ShieldCheck, Layers, RefreshCw, Plus, CheckCircle2, Play, Download, Cloud, Zap, ArrowRight, Shield, Lock, X, Eye, EyeOff, Server, Key } from 'lucide-react';
-import { api, getConnectors, getConfigurations, createConnector, downloadSnapshot } from '../../services/api';
+import { api, getConnectors, getCanvas, createConnector, downloadSnapshot } from '../../services/api';
 import { showSuccess, showError } from '../../utils/toast';
 
 import VaultHeader from './snapshot/VaultHeader';
@@ -24,16 +24,42 @@ export default function SnapshotExplorer({ tenant, onNavigateToBuilder }) {
     setIsRefreshing(true);
     setLoading(true);
     try {
-      const [connRes, cfgRes] = await Promise.all([
+      const [connRes, canvasRes] = await Promise.all([
         getConnectors(),
-        getConfigurations(),
+        getCanvas(),
       ]);
 
+      let connsList = [];
       if (connRes && connRes.data) {
+        connsList = connRes.data;
         setConnectors(connRes.data);
       }
-      if (cfgRes && cfgRes.data) {
-        setConfigurations(cfgRes.data);
+      
+      if (connsList.length === 0) {
+        connsList = [{ id: 'default-1', name: 'Database-to-S3 Backup Workflow Builder', status: 'active' }];
+      }
+
+      if (canvasRes && canvasRes.nodes) {
+        const pipelines = [];
+        connsList.forEach((connItem) => {
+          const connectorNodes = canvasRes.nodes.filter(n => n.connector_id === connItem.id || (!n.connector_id && connsList.length === 1));
+          if (connectorNodes.length > 0) {
+            const pgNode = connectorNodes.find(n => n.node?.sub_type === 'postgres' || n.subtype === 'postgres');
+            const s3Node = connectorNodes.find(n => n.node?.sub_type === 's3' || n.subtype === 's3');
+            pipelines.push({
+              id: connItem.id, // Using connector ID as pipeline ID
+              name: connItem.name,
+              connector_id: connItem.id,
+              source_type: pgNode?.node || {},
+              source_data: pgNode?.config_data || {},
+              destination_type: s3Node?.node || {},
+              destination_data: s3Node?.config_data || {},
+              connectorItem: connItem,
+              connectorName: connItem.name,
+            });
+          }
+        });
+        setConfigurations(pipelines);
       }
     } catch (err) {
       console.error('Failed to load connectors & configurations:', err);
@@ -131,23 +157,8 @@ export default function SnapshotExplorer({ tenant, onNavigateToBuilder }) {
     destType: 'All'
   });
 
-  // Group configurations under Connectors
-  const connectorsList = connectors.length > 0 ? connectors : [
-    { id: 'default-1', name: 'Database-to-S3 Backup Workflow Builder', status: 'active' }
-  ];
-
-  // Flatten out configurations to create a single list of active pipeline streams
-  const activePipelines = [];
-  connectorsList.forEach((connItem) => {
-    const connConfigs = configurations.filter((cfg) => cfg.connector_id === connItem.id || (!cfg.connector_id && connectorsList.length === 1));
-    connConfigs.forEach((cfg) => {
-      activePipelines.push({
-        ...cfg,
-        connectorItem: connItem,
-        connectorName: connItem.name,
-      });
-    });
-  });
+  // Configurations state now contains the active pipelines directly from getCanvas mapping
+  const activePipelines = configurations;
 
   // Extract unique options for the filters
   const connectorNames = [...new Set(activePipelines.map(p => p.connectorName))];

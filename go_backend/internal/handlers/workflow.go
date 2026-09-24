@@ -11,7 +11,6 @@ import (
 	"chunkflow-backend/internal/cdc"
 	"chunkflow-backend/internal/crypto"
 	"chunkflow-backend/internal/db"
-	"chunkflow-backend/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,57 +73,23 @@ func DeployWorkflow(c *gin.Context) {
 		}
 	}
 
-	// 2. Prepare Source & Destination Form Payloads
-	var encSource, encDest string
-	var rawSourceJSON, rawDestJSON string
-
-	if req.Postgres != nil {
-		b, _ := json.Marshal(req.Postgres)
-		rawSourceJSON = string(b)
-		encSource, _ = crypto.Encrypt(rawSourceJSON)
-	}
-	if req.S3 != nil {
-		b, _ := json.Marshal(req.S3)
-		rawDestJSON = string(b)
-		encDest, _ = crypto.Encrypt(rawDestJSON)
-	}
-
-	// 3. Upsert into configurations table
-	var existingConfigID string
-	_ = conn.QueryRowContext(ctx, `SELECT id FROM configurations WHERE connector_id = $1 ORDER BY updated_at DESC LIMIT 1`, connID).Scan(&existingConfigID)
-
-	var configID string
-	if existingConfigID != "" {
-		configID = existingConfigID
-		_, _ = conn.ExecContext(ctx, `
-			UPDATE configurations
-			SET name = $1,
-			    source_encrypted_data = CASE WHEN $2 != '' THEN $2 ELSE source_encrypted_data END,
-			    destination_encrypted_data = CASE WHEN $3 != '' THEN $3 ELSE destination_encrypted_data END,
-			    is_verified = true,
-			    updated_at = NOW()
-			WHERE id = $4
-		`, workflowName, encSource, encDest, existingConfigID)
-	} else {
-		_ = conn.QueryRowContext(ctx, `
-			INSERT INTO configurations (connector_id, name, source_encrypted_data, destination_encrypted_data, is_verified)
-			VALUES ($1, $2, $3, $4, true)
-			RETURNING id
-		`, connID, workflowName, encSource, encDest).Scan(&configID)
-	}
-
-	logger.WriteEncryptionAuditLog(sub, "SAVE_ENCRYPT", configID, connID, rawSourceJSON, encSource, rawDestJSON, encDest)
+	// (Configurations table logic removed as node data is directly mapped from canvas_nodes)
 
 	// 4. Execute FastCDC engine on source database stream
-	cdcResult, cdcErr := cdc.RunCDCWorkflow(sub, workflowName)
+	cdcResult, cdcErr := cdc.RunCDCWorkflow(sub, workflowName, connID)
 	if cdcErr != nil {
-		log.Printf("[FASTCDC_WARN] Failed to complete CDC stream for '%s': %v", sub, cdcErr)
+		log.Printf("[FASTCDC_ERROR] Failed to complete CDC stream for '%s': %v", sub, cdcErr)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Failed to deploy workflow: %v", cdcErr),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":        true,
 		"message":        fmt.Sprintf("Workflow '%s' deployed successfully & FastCDC stream completed for tenant DB '%s'!", workflowName, tenantDB),
-		"deployment_id":  configID,
+		"deployment_id":  "canvas-deployment", // Deprecated configID
 		"connector_id":   connID,
 		"subdomain":      sub,
 		"status":         "deployed",
@@ -154,7 +119,15 @@ func TriggerCDCPipeline(c *gin.Context) {
 		wfName = "Manual FastCDC Stream"
 	}
 
-	res, err := cdc.RunCDCWorkflow(sub, wfName)
+	// Fallback connector resolution if empty
+	var connID string
+	conn, _, err := db.OpenTenantDB(sub)
+	if err == nil {
+		_ = conn.QueryRow(`SELECT id FROM connectors ORDER BY created_at ASC LIMIT 1`).Scan(&connID)
+		conn.Close()
+	}
+
+	res, err := cdc.RunCDCWorkflow(sub, wfName, connID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

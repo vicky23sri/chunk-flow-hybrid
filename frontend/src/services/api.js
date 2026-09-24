@@ -253,6 +253,29 @@ export const api = {
     }
   },
 
+  testS3Connection: async (config) => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/test-s3-connection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          message: data.message || `HTTP ${res.status}: Backend error.`,
+        };
+      }
+      return data;
+    } catch (err) {
+      return {
+        success: false,
+        message: `Network Error: Unable to reach Go Backend at ${GO_API_BASE}. Please ensure \`go run cmd/main.go\` is running in go_backend directory.`,
+      };
+    }
+  },
+
   // ─── Go Backend: Save node config to tenant DB via /tenant-config ─────────
   saveTenantConfig: async (payload) => {
     const subdomain = getActiveSubdomain() || 'default';
@@ -409,7 +432,7 @@ export const api = {
       throw err;
     }
   },
-  // ─── Go Backend: Connectors & Configurations (4-table Architecture) ─────
+  // ─── Go Backend: Canvas Architecture ─────
   getConnectors: async () => {
     const subdomain = getActiveSubdomain() || 'default';
     try {
@@ -438,10 +461,10 @@ export const api = {
     }
   },
 
-  getConfigurations: async () => {
+  getNodes: async () => {
     const subdomain = getActiveSubdomain() || 'default';
     try {
-      const res = await fetch(`${GO_API_BASE}/configurations?subdomain=${encodeURIComponent(subdomain)}`, {
+      const res = await fetch(`${GO_API_BASE}/nodes?subdomain=${encodeURIComponent(subdomain)}`, {
         headers: { 'X-Tenant-Subdomain': subdomain },
       });
       const data = await res.json().catch(() => ({}));
@@ -451,10 +474,27 @@ export const api = {
     }
   },
 
-  saveConfiguration: async (payload) => {
+  getCanvas: async (connectorId) => {
     const subdomain = getActiveSubdomain() || 'default';
     try {
-      const res = await fetch(`${GO_API_BASE}/configurations`, {
+      let url = `${GO_API_BASE}/canvas?subdomain=${encodeURIComponent(subdomain)}`;
+      if (connectorId) {
+        url += `&connector_id=${encodeURIComponent(connectorId)}`;
+      }
+      const res = await fetch(url, {
+        headers: { 'X-Tenant-Subdomain': subdomain },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { success: res.ok && data.success !== false, nodes: data.nodes || [], connections: data.connections || [] };
+    } catch (err) {
+      return { success: false, nodes: [], connections: [] };
+    }
+  },
+
+  saveCanvas: async (payload) => {
+    const subdomain = getActiveSubdomain() || 'default';
+    try {
+      const res = await fetch(`${GO_API_BASE}/canvas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Subdomain': subdomain },
         body: JSON.stringify({ subdomain, ...payload }),
@@ -480,7 +520,7 @@ export const getChunkSize = (...args) => api.getChunkSize(...args);
 export const downloadSnapshot = (...args) => api.downloadSnapshot(...args);
 export const getConnectors = (...args) => api.getConnectors(...args);
 export const createConnector = (...args) => api.createConnector(...args);
-export const getConfigurations = (...args) => api.getConfigurations(...args);
-export const saveConfiguration = (...args) => api.saveConfiguration(...args);
-
-
+export const getNodes = (...args) => api.getNodes(...args);
+export const getCanvas = (...args) => api.getCanvas(...args);
+export const saveCanvas = (...args) => api.saveCanvas(...args);
+export const testS3Connection = (...args) => api.testS3Connection(...args);

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { getNodeDefaultConfig } from '../utils/nodeDefaults';
 import { savePostgresConfig, saveS3Config } from '../services/connectionStorage';
 import { showSuccess, showWarning } from '../utils/toast';
 
@@ -14,8 +15,8 @@ export function useWorkflowCanvas(tenant) {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
   // Drag & Drop Handlers from Sidebar onto Canvas
-  const handleDragStartFromSidebar = (e, type, subtype, nodeKey) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype, nodeKey }));
+  const handleDragStartFromSidebar = (e, type, subtype, nodeKey, nodeDbId, savedConfig = null) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype, nodeKey, nodeDbId, savedConfig }));
   };
 
   const handleDragOverCanvas = (e) => {
@@ -35,7 +36,7 @@ export function useWorkflowCanvas(tenant) {
       const dropX = Math.max(20, Math.min(e.clientX - canvasRect.left - 110, canvasRect.width - 240));
       const dropY = Math.max(20, Math.min(e.clientY - canvasRect.top - 50, canvasRect.height - 200));
 
-      createNode(data.type, data.subtype, data.nodeKey, dropX, dropY);
+      createNode(data.type, data.subtype, data.nodeKey, data.nodeDbId, dropX, dropY, data.savedConfig);
     } catch (err) {
       console.error('Failed to create node on drop:', err);
     }
@@ -48,22 +49,7 @@ export function useWorkflowCanvas(tenant) {
    *  - createNode(type, subtype, targetX, targetY)
    *  - createNode(type, subtype, nodeKey, targetX, targetY)
    */
-  const createNode = (type, subtype, arg3 = null, arg4 = null, arg5 = null) => {
-    let nodeKey = null;
-    let targetX = null;
-    let targetY = null;
-
-    if (typeof arg3 === 'number') {
-      targetX = arg3;
-      targetY = typeof arg4 === 'number' ? arg4 : null;
-    } else if (typeof arg3 === 'string') {
-      nodeKey = arg3;
-      if (typeof arg4 === 'number') {
-        targetX = arg4;
-        targetY = typeof arg5 === 'number' ? arg5 : null;
-      }
-    }
-
+  const createNode = (type, subtype, nodeKey = null, nodeDbId = null, targetX = null, targetY = null, savedConfig = null) => {
     const id = `node_${type}_${Date.now()}`;
 
     let defaultX = type === 'source' ? 60 : 440;
@@ -78,61 +64,23 @@ export function useWorkflowCanvas(tenant) {
     const finalX = typeof targetX === 'number' ? Math.round(targetX) : defaultX;
     const finalY = typeof targetY === 'number' ? Math.round(targetY) : defaultY;
 
-    // Helper title, subtitle & config per subtype
-    let title = `${subtype.toUpperCase()} ${type === 'source' ? 'Source' : 'Destination'}`;
-    let subtitle = 'Enter details...';
-    let config = { name: '' };
+    // Get helper title, subtitle & config per subtype from our new utility file!
+    const { title, subtitle, config } = getNodeDefaultConfig(type, subtype);
 
-    if (subtype === 'postgres') {
-      title = 'Database Source (PostgreSQL)';
-      subtitle = 'Enter database details...';
-      config = { name: '', host: '', port: '5432', database: '', username: '', password: '', useSSL: false, backupSchedule: '', retentionDays: '' };
-    } else if (subtype === 'mysql') {
-      title = 'MySQL Database Source';
-      subtitle = 'Enter MySQL details...';
-      config = { name: '', host: '', port: '3306', database: '', username: '', password: '' };
-    } else if (subtype === 'kafka') {
-      title = 'Apache Kafka Stream';
-      subtitle = 'bootstrap:9092';
-      config = { name: '', bootstrapServers: '', topic: '', groupId: '', saslPassword: '' };
-    } else if (subtype === 'mongodb') {
-      title = 'MongoDB Document Store';
-      subtitle = 'Enter MongoDB URI...';
-      config = { name: '', connectionString: '', database: '', collection: '' };
-    } else if (subtype === 'webhook') {
-      title = 'HTTP Webhook Trigger';
-      subtitle = '/api/v1/webhooks';
-      config = { name: '', endpointUrl: '', secretToken: '' };
-    } else if (subtype === 's3') {
-      title = 'Amazon S3 Vault';
-      subtitle = 's3://vault/';
-      config = { name: '', bucketName: '', region: 'us-east-1', accessKeyId: '', secretAccessKey: '', folderPath: '' };
-    } else if (subtype === 'gcs') {
-      title = 'Google Cloud Storage (GCS)';
-      subtitle = 'gs://bucket/';
-      config = { name: '', bucketName: '', projectId: '', serviceAccountJson: '' };
-    } else if (subtype === 'redis') {
-      title = 'Redis Cache Vault';
-      subtitle = 'redis:6379';
-      config = { name: '', host: '', port: '6379', password: '' };
-    } else if (subtype === 'snowflake') {
-      title = 'Snowflake Data Warehouse';
-      subtitle = 'Enter account ID...';
-      config = { name: '', account: '', username: '', password: '', warehouse: '', database: '' };
-    } else if (subtype === 'pinecone') {
-      title = 'Pinecone Vector DB';
-      subtitle = 'Enter index name...';
-      config = { name: '', environment: '', indexName: '', apiKey: '' };
+    if (savedConfig) {
+      config = { ...config, ...savedConfig };
+      title = savedConfig.name || title;
     }
 
     const newNode = {
       id,
+      nodeDbId,
       nodeKey: nodeKey || `${subtype}_${type}`,
       type,
       subtype,
       x: finalX,
       y: finalY,
-      isValid: false,
+      isValid: !!savedConfig, // Pre-validate if it has a saved config
       title,
       subtitle,
       config,

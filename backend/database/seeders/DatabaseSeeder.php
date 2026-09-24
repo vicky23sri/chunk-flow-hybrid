@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info('✅ SuperAdmin created: admin@chunkflow.com / admin123');
 
+        \config(['tenancy.database.auto_create_tenant_database' => false]);
         $tenant = Tenant::firstOrCreate(
             ['id' => 'acme'], 
             ['name' => 'Acme Corporation', 'subdomain' => 'acme']

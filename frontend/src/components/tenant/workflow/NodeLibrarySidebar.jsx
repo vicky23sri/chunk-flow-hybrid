@@ -26,23 +26,77 @@ const COLOR_MAP = {
 
 export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
   const [nodeTypes, setNodeTypes] = useState([]);
+  const [savedConfigs, setSavedConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const goApiBase = import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1';
     const sub = localStorage.getItem('tenant_subdomain') || 'willsparrow';
-    
-    fetch(`${goApiBase}/configuration-types?subdomain=${encodeURIComponent(sub)}`)
+
+    fetch(`${goApiBase}/nodes?subdomain=${encodeURIComponent(sub)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
         if (data && data.success && Array.isArray(data.data)) {
-          setNodeTypes(data.data);
+          // Filter to only show active nodes as configured in the Node Library page
+          const activeNodes = data.data.filter(n => n.is_active);
+
+          // Add color formatting since API doesn't return `color.name`
+          const formattedData = activeNodes.map(n => {
+            let colorName = n.category === 'source' ? 'blue' : 'emerald';
+            // Parse color from JSON if needed, but the original COLOR_MAP uses string keys 'blue', 'emerald' etc.
+            // For now, fallback to default color based on category
+            if (n.sub_type === 'postgres' || n.sub_type === 'mysql' || n.sub_type === 'gcs') colorName = 'blue';
+            if (n.sub_type === 'kafka') colorName = 'amber';
+            if (n.sub_type === 'mongodb') colorName = 'emerald';
+            if (n.sub_type === 'webhook') colorName = 'purple';
+            if (n.sub_type === 's3') colorName = 'amber'; // Wait, s3 is orange in my seeder
+            if (n.sub_type === 'redis') colorName = 'rose';
+            if (n.sub_type === 'snowflake') colorName = 'cyan';
+            if (n.sub_type === 'pinecone') colorName = 'indigo';
+
+            return { ...n, color: { name: colorName } };
+          });
+          setNodeTypes(formattedData);
         }
       })
-      .catch((err) => console.error('Failed to load node types catalog:', err))
+      .catch((err) => console.error('Failed to load node types catalog:', err));
+
+    // Fetch previously saved configurations
+    fetch(`${goApiBase}/canvas?subdomain=${encodeURIComponent(sub)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.nodes)) {
+          const configuredNodes = data.nodes.filter(n => n.config_data && Object.keys(n.config_data).length > 0 && n.config_data.name);
+          const formatted = configuredNodes.map(n => ({
+            id: `saved_${n.element_id}`,
+            node_key: n.node_key || `${n.sub_type}_saved`,
+            name: n.config_data.name,
+            category: 'saved_config',
+            original_category: n.category,
+            sub_type: n.sub_type,
+            color: { name: 'purple' },
+            saved_config: n.config_data,
+            original_node_db_id: n.node_id
+          }));
+
+          const uniqueConfigs = [];
+          const seenNames = new Set();
+          for (const c of formatted) {
+            if (!seenNames.has(c.name)) {
+              seenNames.add(c.name);
+              uniqueConfigs.push(c);
+            }
+          }
+          setSavedConfigs(uniqueConfigs);
+        }
+      })
+      .catch((err) => console.error('Failed to load saved configs:', err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -66,8 +120,8 @@ export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
       <div
         key={item.id || item.node_key}
         draggable
-        onDragStart={(e) => onDragStart(e, item.category, item.sub_type, item.node_key)}
-        onClick={() => onCreateNode(item.category, item.sub_type, item.node_key)}
+        onDragStart={(e) => onDragStart(e, item.original_category || item.category, item.sub_type, item.node_key, item.original_node_db_id || item.id, item.saved_config)}
+        onClick={() => onCreateNode(item.original_category || item.category, item.sub_type, item.node_key, item.original_node_db_id || item.id, null, null, item.saved_config)}
         className={`p-3 rounded-2xl bg-white border border-slate-200 ${colors.border} hover:shadow-md transition-all cursor-grab active:cursor-grabbing text-left flex items-center gap-3 shadow-xs group`}
       >
         <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${colors.badge}`}>
@@ -119,6 +173,18 @@ export default function NodeLibrarySidebar({ onDragStart, onCreateNode }) {
             {displayDestinations.map(renderNodeItem)}
           </div>
         </div>
+
+        {/* 3. SAVED CONFIGURATIONS SECTION */}
+        {/* {savedConfigs.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-slate-200 mt-2">
+            <span className="text-[10px] font-mono font-bold text-purple-600 uppercase flex items-center gap-1.5 tracking-tight">
+              <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> 3. SAVED CONFIGS ({savedConfigs.length})
+            </span>
+            <div className="space-y-2">
+              {savedConfigs.map(renderNodeItem)}
+            </div>
+          </div>
+        )} */}
       </div>
 
       {/* Connection Instructions Box */}

@@ -114,13 +114,9 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
       // Fetch saved decrypted configurations for this connector / tenant
       let savedCfg = null;
       try {
-        const cfgRes = await api.getConfigurations();
-        if (cfgRes && Array.isArray(cfgRes.data) && cfgRes.data.length > 0) {
-          if (initialWorkflow?.id) {
-            savedCfg = cfgRes.data.find((c) => c.connector_id === initialWorkflow.id);
-          } else {
-            savedCfg = cfgRes.data[0];
-          }
+        const cfgRes = await api.getCanvas(initialWorkflow?.id);
+        if (cfgRes && cfgRes.nodes && cfgRes.nodes.length > 0) {
+          savedCfg = cfgRes;
         }
       } catch (e) {
         console.error('Failed to fetch saved configuration:', e);
@@ -130,16 +126,20 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
         const pgId = `node_source_${Date.now()}`;
         const s3Id = `node_destination_${Date.now() + 1}`;
 
-        const srcData = savedCfg.source_data || {};
-        const destData = savedCfg.destination_data || {};
+        // Extract from canvas nodes
+        const pgCanvasNode = savedCfg.nodes.find(n => n.node?.sub_type === 'postgres' || n.subtype === 'postgres');
+        const s3CanvasNode = savedCfg.nodes.find(n => n.node?.sub_type === 's3' || n.subtype === 's3');
 
-        const srcSubtype = savedCfg.source_type?.sub_type || 'postgres';
-        const destSubtype = savedCfg.destination_type?.sub_type || 's3';
+        const srcData = pgCanvasNode?.config_data || {};
+        const destData = s3CanvasNode?.config_data || {};
 
-        const srcTitle = srcData.name || savedCfg.source_type?.name || 'Source Database';
+        const srcSubtype = pgCanvasNode?.node?.sub_type || 'postgres';
+        const destSubtype = s3CanvasNode?.node?.sub_type || 's3';
+
+        const srcTitle = srcData.name || pgCanvasNode?.node?.name || 'Source Database';
         const srcSub = srcData.database || srcData.database_name || `chunkflow_tenant_${tenant?.subdomain || 'default'}`;
 
-        const destTitle = destData.name || savedCfg.destination_type?.name || 'Amazon S3 Vault';
+        const destTitle = destData.name || s3CanvasNode?.node?.name || 'Amazon S3 Vault';
         const destBucket = destData.bucketName || destData.bucket_name || '';
         const destPath = destData.folderPath || destData.folder_path || '';
         const destSub = destBucket ? `s3://${destBucket}${destPath}` : 's3://vault/';
@@ -189,10 +189,30 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
           },
         };
 
-        setNodes([loadedPgNode, loadedS3Node]);
-        setConnections([{ id: `conn_${Date.now()}`, sourceId: pgId, targetId: s3Id }]);
-        setSelectedNodeId(pgId);
-        showSuccess(`Loaded canvas and populated decrypted configuration for "${savedCfg.name || initialWorkflow?.name || 'Connector Pipeline'}"!`, 'Pipeline Loaded');
+        setNodes(savedCfg.nodes.map(n => ({
+          id: n.element_id,
+          type: n.node?.category || 'transform',
+          subtype: n.node?.sub_type,
+          x: n.position_x,
+          y: n.position_y,
+          isValid: n.is_verified,
+          title: n.label,
+          subtitle: '',
+          config: n.config_data || {}
+        })));
+        setConnections(savedCfg.connections.map(c => {
+          const srcNode = savedCfg.nodes.find(n => n.id === c.source_canvas_node_id);
+          const tgtNode = savedCfg.nodes.find(n => n.id === c.target_canvas_node_id);
+          return {
+            id: c.id,
+            sourceId: srcNode ? srcNode.element_id : c.source_canvas_node_id,
+            targetId: tgtNode ? tgtNode.element_id : c.target_canvas_node_id
+          };
+        }));
+        if (savedCfg.nodes.length > 0) {
+          setSelectedNodeId(savedCfg.nodes[0].element_id);
+        }
+        showSuccess(`Loaded canvas and populated decrypted configuration for "${initialWorkflow?.name || 'Connector Pipeline'}"!`, 'Pipeline Loaded');
         return;
       }
 
@@ -234,11 +254,32 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
       saveS3Config(selectedNode.config);
     }
 
-    const result = await api.saveTenantConfig(
-      selectedNode.subtype === 'postgres'
-        ? { postgres: selectedNode.config }
-        : { s3: selectedNode.config }
-    );
+    const resTypes = await fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/nodes?subdomain=${encodeURIComponent(tenant?.subdomain || 'willsparrow')}`);
+    const typesData = await resTypes.json();
+    const nodeTypes = typesData.data || [];
+
+    const payloadNodes = nodes.map(n => ({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      node_id: n.nodeDbId || nodeTypes.find(t => t.sub_type === n.subtype)?.id,
+      element_id: n.id,
+      label: n.title,
+      position_x: n.x,
+      position_y: n.y,
+      config_data: n.config,
+      is_verified: n.isValid || true
+    }));
+
+    const payloadConns = connections.map(c => ({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      source_canvas_node_id: c.sourceId,
+      target_canvas_node_id: c.targetId
+    }));
+
+    const result = await api.saveCanvas({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      nodes: payloadNodes,
+      connections: payloadConns
+    });
 
     if (!result.success) {
       showError(result.message || 'Failed to save configuration to database.', 'DB Save Failed');
@@ -293,19 +334,30 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
         showError(msg, 'Connection Test Failed');
       }
     } else if (selectedNode.subtype === 's3') {
-      setTimeout(() => {
+      try {
+        const res = await api.testS3Connection(config);
         setIsTestingConnection(false);
-        const bucket = config.bucketName?.trim();
-        const msg = `Configuration Verified! Access granted to S3 Bucket "${bucket}".`;
-        setTestResult({ type: 'success', success: true, message: msg });
-        showSuccess(msg, 'Amazon S3 Vault Verified');
-        setS3Details({ ...config });
-        setShowS3Modal(true);
+        if (res && res.success) {
+          const msg = res.message || `Configuration Verified! Access granted to S3 Bucket.`;
+          setTestResult({ type: 'success', success: true, message: msg });
+          showSuccess(msg, 'Amazon S3 Vault Verified');
+          setS3Details({ ...config });
+          setShowS3Modal(true);
 
-        setNodes((prev) =>
-          prev.map((n) => (n.id === selectedNodeId ? { ...n, isValid: true } : n))
-        );
-      }, 600);
+          setNodes((prev) =>
+            prev.map((n) => (n.id === selectedNodeId ? { ...n, isValid: true } : n))
+          );
+        } else {
+          const msg = res?.message || 'S3 Connection Failed.';
+          setTestResult({ type: 'error', success: false, message: msg });
+          showError(msg, 'S3 Connection Failed');
+        }
+      } catch (err) {
+        setIsTestingConnection(false);
+        const msg = err.message || 'Failed to trigger S3 connection test via Go Backend.';
+        setTestResult({ type: 'error', success: false, message: msg });
+        showError(msg, 'Connection Test Failed');
+      }
     }
   };
 
@@ -332,6 +384,35 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
     setIsDeploying(true);
     setDeploySuccess(false);
 
+    // 1. Force a save of the entire canvas (Nodes & Connections) to the new DB schema
+    const resTypes = await fetch(`${import.meta.env.VITE_GO_API_URL || 'http://localhost:8080/api/v1'}/nodes?subdomain=${encodeURIComponent(tenant?.subdomain || 'willsparrow')}`);
+    const typesData = await resTypes.json();
+    const nodeTypes = typesData.data || [];
+
+    const payloadNodes = nodes.map(n => ({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      node_id: n.nodeDbId || nodeTypes.find(t => t.sub_type === n.subtype)?.id,
+      element_id: n.id,
+      label: n.title,
+      position_x: n.x,
+      position_y: n.y,
+      config_data: n.config,
+      is_verified: n.isValid || true
+    }));
+
+    const payloadConns = connections.map(c => ({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      source_canvas_node_id: c.sourceId,
+      target_canvas_node_id: c.targetId
+    }));
+
+    await api.saveCanvas({
+      connector_id: initialWorkflow?.id || 'default_connector',
+      nodes: payloadNodes,
+      connections: payloadConns
+    });
+
+    // 2. Trigger FastCDC Deployment
     const postgresNode = nodes.find((n) => n.subtype === 'postgres');
     const s3Node = nodes.find((n) => n.subtype === 's3');
 

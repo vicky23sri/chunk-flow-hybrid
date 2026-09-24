@@ -7,7 +7,7 @@ import {
   Layers, Users, Sparkles, Terminal, AlertCircle, Check, Copy, ArrowRight,
   Projector, Clock, Settings, Plug, LayoutDashboard, ChevronRight, Cpu, LogOut,
   ChevronDown, BarChart3, Radio, PanelLeftClose, PanelLeftOpen, ChevronLeft, ChevronRight as ChevronRightIcon,
-  Menu, X
+  Menu, X, Server
 } from 'lucide-react';
 
 import WorkflowBuilder from '../components/tenant/WorkflowBuilder';
@@ -24,6 +24,7 @@ import ActivityFeed from '../components/tenant/overview/ActivityFeed';
 import ConnectorsList from '../components/tenant/overview/ConnectorsList';
 import RecentWorkflows from '../components/tenant/overview/RecentWorkflows';
 import QuickActions from '../components/tenant/overview/QuickActions';
+import SavedNodesListView from '../components/tenant/SavedNodesListView';
 
 export default function Dashboard({ user, tenant, onTenantChange }) {
   const [projects, setProjects] = useState([]);
@@ -196,6 +197,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       items: [
         { id: 'overview', label: 'Overview', icon: LayoutDashboard },
         { id: 'workflow', label: 'Workflow Builder', icon: Projector, badge: 'Canvas' },
+        { id: 'nodes_list', label: 'Nodes List', icon: Server },
       ],
     },
     {
@@ -435,6 +437,11 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
         {/* ── SECTION: CDC SNAPSHOTS HISTORY ──────────────────────────── */}
         {activeSection === 'history_snapshots' && (
           <SnapshotHistoryView tenant={tenant} />
+        )}
+
+        {/* ── SECTION: SAVED NODES LIST ───────────────────────────────── */}
+        {activeSection === 'nodes_list' && (
+          <SavedNodesListView onNavigateToBuilder={handleNavigateToBuilder} />
         )}
 
       </main>

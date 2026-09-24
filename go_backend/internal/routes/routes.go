@@ -36,15 +36,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	v1 := router.Group("/api/v1")
 	{
 		v1.POST("/test-db-connection", handlers.TestDBConnection)
-		v1.POST("/tenant-config", handlers.SaveTenantConfig)
-		v1.GET("/tenant-config", handlers.GetTenantConfig)
+		v1.POST("/test-s3-connection", handlers.TestS3Connection)
 
-		// Catalog, Connectors, & Configurations (4-table Architecture)
-		v1.GET("/configuration-types", handlers.GetConfigurationTypes)
+		// Catalog, Connectors, & Canvas (Node Architecture)
+		v1.GET("/nodes", handlers.GetNodes)
+		v1.POST("/nodes/:id/toggle", handlers.ToggleNodeActive)
 		v1.GET("/connectors", handlers.GetConnectors)
 		v1.POST("/connectors", handlers.CreateConnector)
-		v1.GET("/configurations", handlers.GetConfigurations)
-		v1.POST("/configurations", handlers.SaveConfiguration)
+		v1.GET("/canvas", handlers.GetCanvas)
+		v1.POST("/canvas", handlers.SaveCanvas)
 
 		v1.POST("/workflow/deploy", handlers.DeployWorkflow)
 		v1.POST("/workflow/trigger-cdc", handlers.TriggerCDCPipeline)

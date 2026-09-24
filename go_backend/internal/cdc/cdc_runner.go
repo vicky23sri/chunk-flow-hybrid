@@ -1,8 +1,10 @@
 package cdc
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,33 +13,49 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+
 	"chunkflow-backend/internal/crypto"
 	"chunkflow-backend/internal/db"
 	"chunkflow-backend/internal/logger"
 )
 
-// getPgDumpStream reads real PostgreSQL source credentials from the tenant's source_configurations table
+// getPgDumpStream reads real PostgreSQL source credentials from the canvas_nodes table
 // (or environment variables) and executes pg_dump matching chunk-flow's SnapshotReader.
-func getPgDumpStream(ctx context.Context, conn *sql.DB, tenantDB string) ([]byte, error) {
+func getPgDumpStream(ctx context.Context, conn *sql.DB, tenantDB string, connectorID string) ([]byte, error) {
 	var host, port, user, password, dbName string
 
-	// 1. Query source_configurations table from the tenant DB for real source credentials
-	var encHost, encPort, encUser, encPass, encDB string
+	// 1. Query canvas_nodes for PostgreSQL credentials
+	var encConfig string
 	err := conn.QueryRowContext(ctx, `
-		SELECT host, port, username, password, database_name
-		FROM source_configurations
-		ORDER BY updated_at DESC LIMIT 1
-	`).Scan(&encHost, &encPort, &encUser, &encPass, &encDB)
+		SELECT cn.encrypted_config
+		FROM canvas_nodes cn
+		JOIN nodes n ON cn.node_id = n.id
+		WHERE cn.connector_id = $1 AND (n.sub_type = 'postgres' OR cn.element_id LIKE 'node_source_%')
+		LIMIT 1
+	`, connectorID).Scan(&encConfig)
 
-	if err == nil {
-		host, _ = crypto.Decrypt(encHost)
-		port, _ = crypto.Decrypt(encPort)
-		user, _ = crypto.Decrypt(encUser)
-		password, _ = crypto.Decrypt(encPass)
-		dbName, _ = crypto.Decrypt(encDB)
+	if err == nil && encConfig != "" {
+		decrypted, decErr := crypto.Decrypt(encConfig)
+		if decErr == nil {
+			var config map[string]interface{}
+			if err := json.Unmarshal([]byte(decrypted), &config); err == nil {
+				if v, ok := config["host"].(string); ok { host = v }
+				if v, ok := config["port"].(string); ok { port = v }
+				if v, ok := config["username"].(string); ok { user = v }
+				if v, ok := config["password"].(string); ok { password = v }
+				if v, ok := config["database"].(string); ok { dbName = v }
+				if dbName == "" {
+					if v, ok := config["database_name"].(string); ok { dbName = v }
+				}
+			}
+		}
 	}
 
-	// 2. Read from environment variables if not specified in source_configurations table
+	// 2. Read from environment variables if not specified in canvas_nodes table
 	if host == "" {
 		host = os.Getenv("DB_HOST")
 	}
@@ -98,8 +116,8 @@ type CDCRunnerResult struct {
 }
 
 // RunCDCWorkflow extracts source database stream using pg_dump (matching chunk-flow),
-// slices the data using FastCDC, logs chunk details, and updates vault records.
-func RunCDCWorkflow(subdomain, workflowName string) (*CDCRunnerResult, error) {
+// slices the data using FastCDC, uploads to actual S3, and updates vault records.
+func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResult, error) {
 	start := time.Now()
 	if subdomain == "" {
 		subdomain = "default"
@@ -141,23 +159,12 @@ func RunCDCWorkflow(subdomain, workflowName string) (*CDCRunnerResult, error) {
 
 	// 2. Obtain real database snapshot dump payload via pg_dump CLI (matching chunk-flow)
 	var bytePayload []byte
-	if dumpBytes, dumpErr := getPgDumpStream(ctx, conn, tenantDB); dumpErr == nil && len(dumpBytes) > 0 {
+	if dumpBytes, dumpErr := getPgDumpStream(ctx, conn, tenantDB, connectorID); dumpErr == nil && len(dumpBytes) > 0 {
 		bytePayload = dumpBytes
 		log.Printf("[CDC] Successfully captured %d bytes via real pg_dump stream for DB '%s'", len(bytePayload), tenantDB)
 	} else {
-		// Fallback real table schema export if pg_dump CLI is unavailable
-		var rawData strings.Builder
-		rawData.WriteString(fmt.Sprintf("-- FastCDC Database Export for Tenant: %s (DB: %s)\n", subdomain, tenantDB))
-		rawData.WriteString(fmt.Sprintf("-- Exported At: %s\n\n", time.Now().Format(time.RFC3339)))
-
-		for _, tbl := range tables {
-			rawData.WriteString(fmt.Sprintf("TABLE: %s\n", tbl))
-			var count int64
-			_ = conn.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM public.%q", tbl)).Scan(&count)
-			rawData.WriteString(fmt.Sprintf("ROW_COUNT: %d\n", count))
-			rawData.WriteString(strings.Repeat("=", 60) + "\n")
-		}
-		bytePayload = []byte(rawData.String())
+		log.Printf("[CDC ERROR] Failed to capture pg_dump stream from source DB: %v", dumpErr)
+		return nil, fmt.Errorf("failed to capture source database stream (check postgres credentials): %v", dumpErr)
 	}
 
 	// 3. Execute PlakarKorp FastCDC algorithm on raw byte payload
@@ -170,10 +177,47 @@ func RunCDCWorkflow(subdomain, workflowName string) (*CDCRunnerResult, error) {
 	now := time.Now().UTC()
 	manifestID := fmt.Sprintf("db-%s", now.Format("20060102-150405"))
 
-	destKey := fmt.Sprintf("s3://chunkflow-vault-%s/raw/chunkflow/%s_%d.cdc",
-		subdomain, strings.ToLower(strings.ReplaceAll(workflowName, " ", "_")), time.Now().Unix())
+	// 4. Fetch S3 credentials from canvas_nodes
+	var s3EncConfig string
+	_ = conn.QueryRowContext(ctx, `
+		SELECT cn.encrypted_config
+		FROM canvas_nodes cn
+		JOIN nodes n ON cn.node_id = n.id
+		WHERE cn.connector_id = $1 AND (n.sub_type = 's3' OR cn.element_id LIKE 'node_destination_%')
+		LIMIT 1
+	`, connectorID).Scan(&s3EncConfig)
 
-	// 4. Persist local CDC vault backup chunk artifact & dump
+	var s3Bucket, s3Region, s3AccessKey, s3SecretKey, s3Folder string
+	if s3EncConfig != "" {
+		if decrypted, err := crypto.Decrypt(s3EncConfig); err == nil {
+			var config map[string]interface{}
+			if err := json.Unmarshal([]byte(decrypted), &config); err == nil {
+				if v, ok := config["bucketName"].(string); ok { s3Bucket = v }
+				if v, ok := config["region"].(string); ok { s3Region = v }
+				if v, ok := config["accessKeyId"].(string); ok { s3AccessKey = v }
+				if v, ok := config["secretAccessKey"].(string); ok { s3SecretKey = v }
+				if v, ok := config["folderPath"].(string); ok { s3Folder = v }
+			}
+		}
+	}
+	if s3Bucket == "" {
+		s3Bucket = fmt.Sprintf("chunkflow-vault-%s", subdomain)
+	}
+	if s3Region == "" {
+		s3Region = "us-east-1"
+	}
+	if s3Folder == "" {
+		s3Folder = "raw/chunkflow"
+	}
+	s3Folder = strings.Trim(s3Folder, "/")
+	if s3Folder == "" {
+		s3Folder = "raw"
+	}
+
+	s3Key := fmt.Sprintf("%s/%s_%d.cdc", s3Folder, strings.ToLower(strings.ReplaceAll(workflowName, " ", "_")), time.Now().Unix())
+	destKey := fmt.Sprintf("s3://%s/%s", s3Bucket, s3Key)
+
+	// 5. Persist local CDC vault backup chunk artifact & dump
 	_ = os.MkdirAll("logs/vault", 0755)
 	localVaultFile := filepath.Join("logs/vault", fmt.Sprintf("%s_backup.cdc", subdomain))
 	_ = os.WriteFile(localVaultFile, bytePayload, 0644)
@@ -181,7 +225,35 @@ func RunCDCWorkflow(subdomain, workflowName string) (*CDCRunnerResult, error) {
 	dumpFile := filepath.Join("logs/vault", fmt.Sprintf("%s.dump", manifestID))
 	_ = os.WriteFile(dumpFile, bytePayload, 0644)
 
-	// 5. Save Manifest JSON & update master.csv + size.json
+	// 6. Upload to real AWS S3 using AWS SDK
+	if s3AccessKey != "" && s3SecretKey != "" {
+		awsCfg := aws.NewConfig().
+			WithRegion(s3Region).
+			WithCredentials(credentials.NewStaticCredentials(s3AccessKey, s3SecretKey, ""))
+		sess, err := session.NewSession(awsCfg)
+		if err == nil {
+			s3Svc := s3.New(sess)
+			_, err = s3Svc.PutObject(&s3.PutObjectInput{
+				Bucket: aws.String(s3Bucket),
+				Key:    aws.String(s3Key),
+				Body:   bytes.NewReader(bytePayload),
+			})
+			if err != nil {
+				log.Printf("[S3 UPLOAD ERROR] Failed to upload CDC file to S3: %v", err)
+				return nil, fmt.Errorf("failed to upload CDC file to S3: %v", err)
+			} else {
+				log.Printf("[S3 UPLOAD SUCCESS] Uploaded to %s", destKey)
+			}
+		} else {
+			log.Printf("[S3 SESSION ERROR] Failed to create AWS session: %v", err)
+			return nil, fmt.Errorf("failed to create AWS session: %v", err)
+		}
+	} else {
+		log.Printf("[S3 SKIP] No valid S3 credentials found, skipping actual AWS upload.")
+		return nil, fmt.Errorf("no valid S3 credentials found for upload")
+	}
+
+	// 7. Save Manifest JSON & update master.csv + size.json
 	manifest := &SnapshotManifest{
 		ID:           manifestID,
 		Subdomain:    subdomain,
@@ -202,7 +274,7 @@ func RunCDCWorkflow(subdomain, workflowName string) (*CDCRunnerResult, error) {
 	prevSize, _ := ReadSize()
 	_ = SaveSize(prevSize + chunkRes.DedupBytes)
 
-	// 6. Write detailed logs to logs/fastcdc_stream.log and stdout
+	// 8. Write detailed logs to logs/fastcdc_stream.log and stdout
 	detailMsg := fmt.Sprintf("DB=%s TABLES=%v VAULT_FILE=%s MANIFEST_ID=%s", tenantDB, tables, localVaultFile, manifestID)
 	logger.WriteFastCDCLog(
 		subdomain,
