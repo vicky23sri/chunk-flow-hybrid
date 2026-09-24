@@ -21,18 +21,14 @@ export default function VaultHeader({
         
         {/* Title Section */}
         <div className="space-y-4 max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100 text-slate-700 backdrop-blur-md">
-            <ShieldCheck size={14} className="text-[#f95716]" />
-            <span className="text-[10px] font-bold font-mono tracking-widest uppercase">Secure Infrastructure</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#f95716] to-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
-              <Database size={28} />
+          <h1 className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#f95716] to-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+              <Database size={20} />
             </div>
             <span>Backup Vault & Topology</span>
           </h1>
-          <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-md">
-            Manage your synchronized data streams, monitor active FastCDC pipelines, and configure secure storage destinations for <span className="text-slate-900 font-bold">{tenant?.name || 'your tenant'}</span>.
+          <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-lg">
+            Manage your synchronized data streams, monitor active pipelines, and configure secure storage destinations.
           </p>
         </div>
 

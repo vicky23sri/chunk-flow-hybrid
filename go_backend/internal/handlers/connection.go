@@ -13,6 +13,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	
+	"bytes"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 // TestDBConnection handles POST /api/v1/test-db-connection
@@ -170,3 +176,74 @@ func TestDBConnection(c *gin.Context) {
 		"tables":        tables,
 	})
 }
+
+// TestS3Connection handles POST /api/v1/test-s3-connection
+func TestS3Connection(c *gin.Context) {
+	var req models.TestS3ConnectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid connection parameters format.",
+		})
+		return
+	}
+
+	// Decrypt any encrypted fields if present
+	req.AccessKeyID, _ = crypto.Decrypt(req.AccessKeyID)
+	req.SecretAccessKey, _ = crypto.Decrypt(req.SecretAccessKey)
+	req.Region, _ = crypto.Decrypt(req.Region)
+	req.BucketName, _ = crypto.Decrypt(req.BucketName)
+
+	if req.AccessKeyID == "" || req.SecretAccessKey == "" || req.BucketName == "" || req.Region == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Connection Failed: Missing required S3 fields."})
+		return
+	}
+
+	time.Sleep(600 * time.Millisecond) // Simulate processing delay
+
+	creds := credentials.NewStaticCredentials(req.AccessKeyID, req.SecretAccessKey, "")
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(req.Region),
+		Credentials: creds,
+	})
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": fmt.Sprintf("Failed to initialize AWS session: %v", err)})
+		return
+	}
+
+	svc := s3.New(sess)
+
+	// Test 1: Check bucket region and existence
+	_, err = svc.HeadBucket(&s3.HeadBucketInput{
+		Bucket: aws.String(req.BucketName),
+	})
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": fmt.Sprintf("Bucket access failed (check region/existence): %v", err)})
+		return
+	}
+
+	// Test 2: Try a PutObject to ensure write permissions
+	testKey := "chunkflow_connection_test_" + fmt.Sprintf("%d", time.Now().Unix()) + ".txt"
+	_, err = svc.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(req.BucketName),
+		Key:    aws.String(testKey),
+		Body:   bytes.NewReader([]byte("This is a connection test from ChunkFlow.")),
+	})
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": fmt.Sprintf("Write permission test failed: %v", err)})
+		return
+	}
+
+	// Clean up test file
+	_, _ = svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(req.BucketName),
+		Key:    aws.String(testKey),
+	})
+
+	msg := fmt.Sprintf("Configuration Verified! Access granted to S3 Bucket \"%s\" in %s.", req.BucketName, req.Region)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": msg,
+	})
+}
+

@@ -10,8 +10,8 @@ import (
 
 	"chunkflow-backend/internal/crypto"
 	"chunkflow-backend/internal/db"
-	"chunkflow-backend/internal/logger"
 	"chunkflow-backend/internal/models"
+	"chunkflow-backend/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,8 +23,8 @@ func safeStr(ptr *string) string {
 	return ""
 }
 
-// GetConfigurationTypes handles GET /api/v1/configuration-types
-func GetConfigurationTypes(c *gin.Context) {
+// GetNodes handles GET /api/v1/nodes
+func GetNodes(c *gin.Context) {
 	sub := c.Query("subdomain")
 	if sub == "" {
 		sub = c.GetHeader("X-Tenant-Subdomain")
@@ -44,12 +44,9 @@ func GetConfigurationTypes(c *gin.Context) {
 	defer cancel()
 
 	rows, err := conn.QueryContext(ctx, `
-		SELECT ct.id, ct.node_key, ct.name, ct.category, ct.sub_type, ct.fields_schema, ct.is_active, ct.sort_order,
-		       c.id, c.name, c.hex_code, c.bg_class, c.text_class
-		FROM configuration_types ct
-		LEFT JOIN colors c ON ct.color_id = c.id
-		WHERE ct.is_active = true
-		ORDER BY ct.sort_order ASC
+		SELECT id, node_key, name, category, sub_type, color, fields_schema, is_active, sort_order
+		FROM nodes
+		ORDER BY sort_order ASC, name ASC
 	`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
@@ -57,36 +54,98 @@ func GetConfigurationTypes(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var list []models.ConfigurationType
+	var list []models.Node
 	for rows.Next() {
-		var ct models.ConfigurationType
-		var fieldsJSON []byte
-		var colID, colName, colHex, colBg, colText *string
+		var n models.Node
+		var colorJSON, fieldsJSON []byte
 
 		if e := rows.Scan(
-			&ct.ID, &ct.NodeKey, &ct.Name, &ct.Category, &ct.SubType, &fieldsJSON, &ct.IsActive, &ct.SortOrder,
-			&colID, &colName, &colHex, &colBg, &colText,
+			&n.ID, &n.NodeKey, &n.Name, &n.Category, &n.SubType, &colorJSON, &fieldsJSON, &n.IsActive, &n.SortOrder,
 		); e == nil {
-			_ = json.Unmarshal(fieldsJSON, &ct.FieldsSchema)
-			if colID != nil {
-				ct.ColorID = colID
-				ct.Color = &models.Color{
-					ID:        *colID,
-					Name:      *colName,
-					HexCode:   *colHex,
-					BgClass:   *colBg,
-					TextClass: *colText,
-				}
-			}
-			list = append(list, ct)
+			_ = json.Unmarshal(colorJSON, &n.Color)
+			_ = json.Unmarshal(fieldsJSON, &n.FieldsSchema)
+			list = append(list, n)
 		}
 	}
 
-	log.Printf("[NODE_CATALOG] Loaded %d configuration node types for tenant '%s'", len(list), sub)
+	log.Printf("[NODE_CATALOG] Loaded %d nodes for tenant '%s'", len(list), sub)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    list,
+	})
+}
+
+// ToggleNodeActive toggles the is_active status of a node
+func ToggleNodeActive(c *gin.Context) {
+	nodeID := c.Param("id")
+	if nodeID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node ID is required"})
+		return
+	}
+
+	sub := c.Query("subdomain")
+	if sub == "" {
+		sub = "default"
+	}
+	dbConn, _, err := db.OpenTenantDB(sub)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "tenant DB error"})
+		return
+	}
+	defer dbConn.Close()
+
+	var currentStatus bool
+	err = dbConn.QueryRow("SELECT is_active FROM nodes WHERE id = $1", nodeID).Scan(&currentStatus)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	newStatus := !currentStatus
+
+	// If we are deactivating, check if the node is used in any active connectors
+	if !newStatus {
+		force := c.Query("force")
+		if force != "true" {
+			rows, err := dbConn.Query(`
+				SELECT DISTINCT c.name 
+				FROM canvas_nodes cn 
+				JOIN connectors c ON cn.connector_id = c.id 
+				WHERE cn.node_id = $1
+			`, nodeID)
+			
+			if err == nil {
+				defer rows.Close()
+				var activeConnectors []string
+				for rows.Next() {
+					var cName string
+					if err := rows.Scan(&cName); err == nil {
+						activeConnectors = append(activeConnectors, cName)
+					}
+				}
+				
+				if len(activeConnectors) > 0 {
+					c.JSON(http.StatusConflict, gin.H{
+						"error": "in_use",
+						"message": "Node is currently active in connectors",
+						"connectors": activeConnectors,
+					})
+					return
+				}
+			}
+		}
+	}
+
+	_, err = dbConn.Exec("UPDATE nodes SET is_active = $1, updated_at = NOW() WHERE id = $2", newStatus, nodeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update node status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"is_active": newStatus,
 	})
 }
 
@@ -112,9 +171,8 @@ func GetConnectors(c *gin.Context) {
 
 	rows, err := conn.QueryContext(ctx, `
 		SELECT c.id, c.name, c.status, c.created_at, c.updated_at,
-		       CASE WHEN cfg.id IS NOT NULL THEN true ELSE false END AS is_configured
+		       EXISTS (SELECT 1 FROM canvas_nodes cn WHERE cn.connector_id = c.id) AS is_configured
 		FROM connectors c
-		LEFT JOIN configurations cfg ON cfg.connector_id = c.id
 		ORDER BY c.updated_at DESC
 	`)
 	if err != nil {
@@ -131,13 +189,13 @@ func GetConnectors(c *gin.Context) {
 			if createdAt != nil {
 				connItem.CreatedAt = createdAt.Format(time.RFC3339)
 			} else {
-                connItem.CreatedAt = time.Now().Format(time.RFC3339)
-            }
+				connItem.CreatedAt = time.Now().Format(time.RFC3339)
+			}
 			if updatedAt != nil {
 				connItem.UpdatedAt = updatedAt.Format(time.RFC3339)
 			} else {
-                connItem.UpdatedAt = time.Now().Format(time.RFC3339)
-            }
+				connItem.UpdatedAt = time.Now().Format(time.RFC3339)
+			}
 			list = append(list, connItem)
 		} else {
 			log.Printf("[CONNECTORS_LIST] Error scanning row: %v", e)
@@ -202,8 +260,8 @@ func CreateConnector(c *gin.Context) {
 	})
 }
 
-// GetConfigurations handles GET /api/v1/configurations
-func GetConfigurations(c *gin.Context) {
+// GetCanvas handles GET /api/v1/canvas
+func GetCanvas(c *gin.Context) {
 	sub := c.Query("subdomain")
 	if sub == "" {
 		sub = c.GetHeader("X-Tenant-Subdomain")
@@ -211,6 +269,7 @@ func GetConfigurations(c *gin.Context) {
 	if sub == "" {
 		sub = "default"
 	}
+	connectorID := c.Query("connector_id")
 
 	conn, _, err := db.OpenTenantDB(sub)
 	if err != nil {
@@ -222,122 +281,115 @@ func GetConfigurations(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	rows, err := conn.QueryContext(ctx, `
-		SELECT cfg.id, cfg.connector_id, cfg.source_type_id, cfg.destination_type_id, cfg.name,
-		       cfg.source_encrypted_data, cfg.destination_encrypted_data, cfg.is_verified, cfg.created_at, cfg.updated_at,
-		       st.node_key, st.name, st.category, st.sub_type,
-		       dt.node_key, dt.name, dt.category, dt.sub_type
-		FROM configurations cfg
-		LEFT JOIN configuration_types st ON cfg.source_type_id = st.id
-		LEFT JOIN configuration_types dt ON cfg.destination_type_id = dt.id
-		ORDER BY cfg.updated_at DESC
-	`)
+	// Query canvas_nodes
+	nodeQuery := `
+		SELECT cn.id, cn.connector_id, cn.node_id, cn.element_id, cn.label, cn.position_x, cn.position_y, cn.encrypted_config, cn.is_verified, cn.created_at, cn.updated_at,
+			   n.node_key, n.name, n.category, n.sub_type
+		FROM canvas_nodes cn
+		LEFT JOIN nodes n ON cn.node_id = n.id
+	`
+	var nodeArgs []interface{}
+	if connectorID != "" {
+		nodeQuery += " WHERE cn.connector_id = $1"
+		nodeArgs = append(nodeArgs, connectorID)
+	}
+
+	nodeRows, err := conn.QueryContext(ctx, nodeQuery, nodeArgs...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
 		return
 	}
-	defer rows.Close()
+	defer nodeRows.Close()
 
-	list := make([]models.Configuration, 0)
-	for rows.Next() {
-		var cfg models.Configuration
-		var connID, srcTypeID, destTypeID *string
-		var srcEnc, destEnc *string
-		var srcKey, srcName, srcCat, srcSub *string
-		var destKey, destName, destCat, destSub *string
+	var nodesList []models.CanvasNode
+	for nodeRows.Next() {
+		var cn models.CanvasNode
+		var n models.Node
+		var encConfig *string
 		var createdAt, updatedAt *time.Time
 
-		if e := rows.Scan(
-			&cfg.ID, &connID, &srcTypeID, &destTypeID, &cfg.Name,
-			&srcEnc, &destEnc, &cfg.IsVerified, &createdAt, &updatedAt,
-			&srcKey, &srcName, &srcCat, &srcSub,
-			&destKey, &destName, &destCat, &destSub,
-		); e != nil {
-			log.Printf("[CONFIGURATIONS_SCAN_ERR] %v", e)
-			continue
-		}
-
-		cfg.ConnectorID = connID
-		cfg.SourceTypeID = srcTypeID
-		cfg.DestinationTypeID = destTypeID
-		if createdAt != nil {
-			cfg.CreatedAt = createdAt.Format(time.RFC3339)
-		}
-		if updatedAt != nil {
-			cfg.UpdatedAt = updatedAt.Format(time.RFC3339)
-		}
-
-		if srcTypeID != nil && srcKey != nil {
-			cfg.SourceType = &models.ConfigurationType{
-				ID:       *srcTypeID,
-				NodeKey:  *srcKey,
-				Name:     *srcName,
-				Category: *srcCat,
-				SubType:  *srcSub,
+		if e := nodeRows.Scan(
+			&cn.ID, &cn.ConnectorID, &cn.NodeID, &cn.ElementID, &cn.Label, &cn.PositionX, &cn.PositionY, &encConfig, &cn.IsVerified, &createdAt, &updatedAt,
+			&n.NodeKey, &n.Name, &n.Category, &n.SubType,
+		); e == nil {
+			n.ID = cn.NodeID
+			cn.Node = &n
+			if createdAt != nil {
+				cn.CreatedAt = createdAt.Format(time.RFC3339)
 			}
-		}
-		if destTypeID != nil && destKey != nil {
-			cfg.DestinationType = &models.ConfigurationType{
-				ID:       *destTypeID,
-				NodeKey:  *destKey,
-				Name:     *destName,
-				Category: *destCat,
-				SubType:  *destSub,
+			if updatedAt != nil {
+				cn.UpdatedAt = updatedAt.Format(time.RFC3339)
 			}
-		}
 
-		// Decrypt Source JSON Payload
-		var rawSourceJSON, rawDestJSON string
-		if srcEnc != nil && *srcEnc != "" {
-			decStr, errDec := crypto.Decrypt(*srcEnc)
-			if errDec == nil && decStr != "" {
-				rawSourceJSON = decStr
-				var sData map[string]interface{}
-				if json.Unmarshal([]byte(decStr), &sData) == nil {
-					cfg.SourceData = sData
+			// Decrypt Configuration
+			if encConfig != nil && *encConfig != "" {
+				cn.EncryptedConfig = *encConfig
+				decStr, errDec := crypto.Decrypt(*encConfig)
+				if errDec == nil && decStr != "" {
+					var cfgData map[string]interface{}
+					if json.Unmarshal([]byte(decStr), &cfgData) == nil {
+						cn.ConfigData = cfgData
+						// Log decryption
+						logger.WriteEncryptionAuditLog(sub, "FETCH_DECRYPT", n.ID, cn.ConnectorID, decStr, *encConfig, "", "")
+					}
 				}
 			}
+
+			nodesList = append(nodesList, cn)
 		}
-
-		// Decrypt Destination JSON Payload
-		if destEnc != nil && *destEnc != "" {
-			decStr, errDec := crypto.Decrypt(*destEnc)
-			if errDec == nil && decStr != "" {
-				rawDestJSON = decStr
-				var dData map[string]interface{}
-				if json.Unmarshal([]byte(decStr), &dData) == nil {
-					cfg.DestinationData = dData
-				}
-			}
-		}
-
-		sEncStr := safeStr(srcEnc)
-		dEncStr := safeStr(destEnc)
-		logger.WriteEncryptionAuditLog(sub, "FETCH_DECRYPT", cfg.ID, safeStr(cfg.ConnectorID), rawSourceJSON, sEncStr, rawDestJSON, dEncStr)
-
-		list = append(list, cfg)
 	}
 
-	log.Printf("[CONFIG_FETCH_DECRYPT] Fetched & decrypted AES-256 payload for %d configuration(s) (Tenant: '%s')", len(list), sub)
+	// Query canvas_connections
+	connQuery := `
+		SELECT id, connector_id, source_canvas_node_id, target_canvas_node_id, source_handle, target_handle, created_at
+		FROM canvas_connections
+	`
+	var connArgs []interface{}
+	if connectorID != "" {
+		connQuery += " WHERE connector_id = $1"
+		connArgs = append(connArgs, connectorID)
+	}
+
+	connRows, err := conn.QueryContext(ctx, connQuery, connArgs...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	defer connRows.Close()
+
+	var connList []models.CanvasConnection
+	for connRows.Next() {
+		var cc models.CanvasConnection
+		var srcHandle, tgtHandle *string
+		var createdAt *time.Time
+
+		if e := connRows.Scan(
+			&cc.ID, &cc.ConnectorID, &cc.SourceCanvasNodeID, &cc.TargetCanvasNodeID, &srcHandle, &tgtHandle, &createdAt,
+		); e == nil {
+			cc.SourceHandle = srcHandle
+			cc.TargetHandle = tgtHandle
+			if createdAt != nil {
+				cc.CreatedAt = createdAt.Format(time.RFC3339)
+			}
+			connList = append(connList, cc)
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    list,
+		"success":     true,
+		"nodes":       nodesList,
+		"connections": connList,
 	})
 }
 
-// SaveConfiguration handles POST /api/v1/configurations
-func SaveConfiguration(c *gin.Context) {
-	var req models.TenantConfigRequest
+// SaveCanvas handles POST /api/v1/canvas
+func SaveCanvas(c *gin.Context) {
+	var req models.SaveCanvasRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid payload"})
 		return
 	}
-	SaveConfigurationInternal(c, req)
-}
 
-// SaveConfigurationInternal saves configuration payload into the configurations table
-func SaveConfigurationInternal(c *gin.Context, req models.TenantConfigRequest) {
 	sub := req.Subdomain
 	if sub == "" {
 		sub = c.GetHeader("X-Tenant-Subdomain")
@@ -356,109 +408,91 @@ func SaveConfigurationInternal(c *gin.Context, req models.TenantConfigRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
-	// Ensure Connector ID exists
 	if req.ConnectorID == "" {
-		var firstConnID string
-		_ = conn.QueryRowContext(ctx, `SELECT id FROM connectors ORDER BY created_at ASC LIMIT 1`).Scan(&firstConnID)
-		if firstConnID == "" {
-			_ = conn.QueryRowContext(ctx, `INSERT INTO connectors (name) VALUES ('Database-to-S3 Backup Workflow Builder') RETURNING id`).Scan(&firstConnID)
-		}
-		req.ConnectorID = firstConnID
-	}
-
-	// Resolve Source & Destination Type IDs
-	var srcTypeID, destTypeID *string
-	if req.SourceNodeKey != "" {
-		var id string
-		if err := conn.QueryRowContext(ctx, `SELECT id FROM configuration_types WHERE node_key = $1`, req.SourceNodeKey).Scan(&id); err == nil {
-			srcTypeID = &id
-		}
-	} else if req.Postgres != nil {
-		var id string
-		if err := conn.QueryRowContext(ctx, `SELECT id FROM configuration_types WHERE node_key = 'postgres_source'`).Scan(&id); err == nil {
-			srcTypeID = &id
-		}
-	}
-
-	if req.DestinationNodeKey != "" {
-		var id string
-		if err := conn.QueryRowContext(ctx, `SELECT id FROM configuration_types WHERE node_key = $1`, req.DestinationNodeKey).Scan(&id); err == nil {
-			destTypeID = &id
-		}
-	} else if req.S3 != nil {
-		var id string
-		if err := conn.QueryRowContext(ctx, `SELECT id FROM configuration_types WHERE node_key = 's3_destination'`).Scan(&id); err == nil {
-			destTypeID = &id
-		}
-	}
-
-	// Prepare Source & Destination Form Payloads
-	sourcePayload := req.SourceData
-	if sourcePayload == nil && req.Postgres != nil {
-		sourcePayload = req.Postgres
-	}
-	destPayload := req.DestinationData
-	if destPayload == nil && req.S3 != nil {
-		destPayload = req.S3
-	}
-
-	var encSource, encDest string
-	var rawSourceJSON, rawDestJSON string
-
-	if sourcePayload != nil {
-		b, _ := json.Marshal(sourcePayload)
-		rawSourceJSON = string(b)
-		encSource, _ = crypto.Encrypt(rawSourceJSON)
-	}
-	if destPayload != nil {
-		b, _ := json.Marshal(destPayload)
-		rawDestJSON = string(b)
-		encDest, _ = crypto.Encrypt(rawDestJSON)
-	}
-
-	pipelineName := req.Name
-	if pipelineName == "" {
-		pipelineName = "Database-to-S3 Connection Pipeline"
-	}
-
-	// Check if a configuration record exists for this connector
-	var existingConfigID string
-	_ = conn.QueryRowContext(ctx, `SELECT id FROM configurations WHERE connector_id = $1 ORDER BY updated_at DESC LIMIT 1`, req.ConnectorID).Scan(&existingConfigID)
-
-	var savedID string
-	if existingConfigID != "" {
-		_, err = conn.ExecContext(ctx, `
-			UPDATE configurations
-			SET source_type_id = COALESCE($1, source_type_id),
-			    destination_type_id = COALESCE($2, destination_type_id),
-			    name = $3,
-			    source_encrypted_data = CASE WHEN $4 != '' THEN $4 ELSE source_encrypted_data END,
-			    destination_encrypted_data = CASE WHEN $5 != '' THEN $5 ELSE destination_encrypted_data END,
-			    is_verified = true,
-			    updated_at = NOW()
-			WHERE id = $6
-		`, srcTypeID, destTypeID, pipelineName, encSource, encDest, existingConfigID)
-		savedID = existingConfigID
-	} else {
-		err = conn.QueryRowContext(ctx, `
-			INSERT INTO configurations (connector_id, source_type_id, destination_type_id, name, source_encrypted_data, destination_encrypted_data, is_verified)
-			VALUES ($1, $2, $3, $4, $5, $6, true)
-			RETURNING id
-		`, req.ConnectorID, srcTypeID, destTypeID, pipelineName, encSource, encDest).Scan(&savedID)
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": fmt.Sprintf("Failed to save configuration: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Connector ID is required"})
 		return
 	}
 
-	log.Printf("[CONFIG_ENCRYPT_SAVE] Encrypted AES-256 payload & saved Configuration ID '%s' for Connector '%s' (Tenant: '%s')", savedID, req.ConnectorID, sub)
-	logger.WriteEncryptionAuditLog(sub, "SAVE_ENCRYPT", savedID, req.ConnectorID, rawSourceJSON, encSource, rawDestJSON, encDest)
+	// Begin Transaction
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Failed to start transaction"})
+		return
+	}
+
+	// Clean up existing nodes and connections for this connector (full replace)
+	_, err = tx.ExecContext(ctx, `DELETE FROM canvas_nodes WHERE connector_id = $1`, req.ConnectorID)
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Failed to clear old canvas nodes"})
+		return
+	}
+
+	// Insert nodes
+	nodeIDMap := make(map[string]string) // element_id to new uuid
+	for _, n := range req.Nodes {
+		var encConfig string
+		if n.ConfigData != nil {
+			b, _ := json.Marshal(n.ConfigData)
+			encConfig, _ = crypto.Encrypt(string(b))
+		}
+
+		var newID string
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO canvas_nodes (connector_id, node_id, element_id, label, position_x, position_y, encrypted_config, is_verified)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			RETURNING id
+		`, req.ConnectorID, n.NodeID, n.ElementID, n.Label, n.PositionX, n.PositionY, encConfig, n.IsVerified).Scan(&newID)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": fmt.Sprintf("Failed to save node: %v", err)})
+			return
+		}
+		nodeIDMap[n.ElementID] = newID
+
+		if n.ConfigData != nil {
+			b, _ := json.Marshal(n.ConfigData)
+			logger.WriteEncryptionAuditLog(sub, "SAVE_ENCRYPT", newID, req.ConnectorID, string(b), encConfig, "", "")
+			logger.WriteTenantConfigDetailLog("INSERT", sub, "canvas_node", newID, fmt.Sprintf("Saved config for element %s", n.ElementID))
+		}
+	}
+
+	// Insert connections
+	for _, connReq := range req.Connections {
+		srcCanvasNodeID := nodeIDMap[connReq.SourceCanvasNodeID]
+		tgtCanvasNodeID := nodeIDMap[connReq.TargetCanvasNodeID]
+
+		// If frontend sends element_ids, use the mapped uuid; otherwise if it already sends the db uuid, use it.
+		// For robustness, check if we have mapped it (if the payload uses element_id as foreign keys).
+		if srcCanvasNodeID == "" {
+			srcCanvasNodeID = connReq.SourceCanvasNodeID // Fallback to raw UUID
+		}
+		if tgtCanvasNodeID == "" {
+			tgtCanvasNodeID = connReq.TargetCanvasNodeID
+		}
+
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO canvas_connections (connector_id, source_canvas_node_id, target_canvas_node_id, source_handle, target_handle)
+			VALUES ($1, $2, $3, $4, $5)
+		`, req.ConnectorID, srcCanvasNodeID, tgtCanvasNodeID, connReq.SourceHandle, connReq.TargetHandle)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": fmt.Sprintf("Failed to save connection: %v", err)})
+			return
+		}
+	}
+
+	// Commit Transaction
+	err = tx.Commit()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "Failed to commit changes"})
+		return
+	}
+
+	log.Printf("[CANVAS_SAVE] Successfully saved canvas for connector '%s' (Tenant: '%s')", req.ConnectorID, sub)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":      true,
-		"message":      "Configuration saved successfully",
-		"id":           savedID,
-		"connector_id": req.ConnectorID,
+		"success": true,
+		"message": "Canvas saved successfully",
 	})
 }

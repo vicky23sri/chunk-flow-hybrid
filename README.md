@@ -44,12 +44,12 @@ Connect in **TablePlus** or **psql** to inspect the separate physical databases:
 
 ```bash
 # Query Central DB
-PGPASSWORD=vignesh98 psql -h localhost -U virat -d chunkflow_central -c "SELECT name, subdomain, db_name FROM tenants;"
+PGPASSWORD=xxxxx psql -h localhost -U xxxxx -d chunkflow_central -c "SELECT name, subdomain, db_name FROM tenants;"
 
 # Query Dedicated Acme Tenant DB
-PGPASSWORD=vignesh98 psql -h localhost -U virat -d chunkflow_tenant_acme -c "SELECT email, role FROM users;"
+PGPASSWORD=xxxxx psql -h localhost -U xxxxx -d chunkflow_tenant_acme -c "SELECT email, role FROM users;"
 
 # Query Dedicated Wayne Tenant DB
-PGPASSWORD=vignesh98 psql -h localhost -U virat -d chunkflow_tenant_wayne -c "SELECT email, role FROM users;"
+PGPASSWORD=xxxxx psql -h localhost -U xxxxx -d chunkflow_tenant_wayne -c "SELECT email, role FROM users;"
 ```
 # chunk-flow-hybrid
