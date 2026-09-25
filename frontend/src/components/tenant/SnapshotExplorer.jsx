@@ -300,7 +300,7 @@ export default function SnapshotExplorer({ tenant, onNavigateToBuilder }) {
                               <Layers size={16} />
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-black text-slate-900 truncate" title={pipeline.connectorName}>
+                              <div className="text-[13px] font-black text-slate-900 truncate" title={pipeline.connectorName}>
                                 {pipeline.connectorName}
                               </div>
                             </div>
