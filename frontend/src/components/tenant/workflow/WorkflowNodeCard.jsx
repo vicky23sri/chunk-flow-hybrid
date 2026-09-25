@@ -1,31 +1,6 @@
 import React from 'react';
-import { Database, Cloud, Zap, Server, Globe, HardDrive, Layers, Sparkles, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
-
-const ICON_MAP = {
-  postgres: Database,
-  mysql: Database,
-  kafka: Zap,
-  mongodb: Server,
-  webhook: Globe,
-  s3: Cloud,
-  gcs: Cloud,
-  redis: HardDrive,
-  snowflake: Layers,
-  pinecone: Sparkles,
-};
-
-const COLOR_BG_MAP = {
-  postgres: 'bg-blue-600',
-  gcs: 'bg-blue-600',
-  s3: 'bg-emerald-600',
-  mongodb: 'bg-emerald-600',
-  kafka: 'bg-purple-600',
-  pinecone: 'bg-purple-600',
-  mysql: 'bg-indigo-600',
-  redis: 'bg-rose-600',
-  snowflake: 'bg-cyan-600',
-  webhook: 'bg-amber-600',
-};
+import { Database, Cloud, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { ICON_MAP, COLOR_BG_MAP } from '../../../utils/nodeHelpers';
 
 export default function WorkflowNodeCard({
   node,

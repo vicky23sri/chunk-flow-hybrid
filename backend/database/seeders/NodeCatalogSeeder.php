@@ -41,7 +41,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'username', 'label' => 'Username', 'type' => 'text', 'required' => true],
                     ['key' => 'password', 'label' => 'Password', 'type' => 'password', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 2,
             ],
             [
@@ -54,7 +54,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'brokers', 'label' => 'Brokers (comma separated)', 'type' => 'text', 'required' => true],
                     ['key' => 'topic', 'label' => 'Topic', 'type' => 'text', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 3,
             ],
             [
@@ -67,7 +67,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'uri', 'label' => 'Connection URI', 'type' => 'password', 'required' => true],
                     ['key' => 'database', 'label' => 'Database', 'type' => 'text', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 4,
             ],
             [
@@ -79,7 +79,7 @@ class NodeCatalogSeeder extends Seeder
                 'fields_schema' => [
                     ['key' => 'path', 'label' => 'Endpoint Path', 'type' => 'text', 'required' => true, 'default' => '/webhook']
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 5,
             ],
             [
@@ -109,7 +109,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'bucket', 'label' => 'Bucket Name', 'type' => 'text', 'required' => true],
                     ['key' => 'projectId', 'label' => 'Project ID', 'type' => 'text', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 7,
             ],
             [
@@ -123,7 +123,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'port', 'label' => 'Port', 'type' => 'text', 'required' => true, 'default' => '6379'],
                     ['key' => 'password', 'label' => 'Password', 'type' => 'password', 'required' => false]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 8,
             ],
             [
@@ -138,7 +138,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'database', 'label' => 'Database', 'type' => 'text', 'required' => true],
                     ['key' => 'schema', 'label' => 'Schema', 'type' => 'text', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 9,
             ],
             [
@@ -152,7 +152,7 @@ class NodeCatalogSeeder extends Seeder
                     ['key' => 'environment', 'label' => 'Environment', 'type' => 'text', 'required' => true],
                     ['key' => 'indexName', 'label' => 'Index Name', 'type' => 'text', 'required' => true]
                 ],
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 10,
             ]
         ];

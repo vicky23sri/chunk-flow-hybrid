@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Database, RefreshCw, ShieldCheck, HardDrive, Calendar, Clock, Download, Hash } from 'lucide-react';
+import { Database, RefreshCw, ShieldCheck, HardDrive, Calendar, Clock, Download, Hash, FileText } from 'lucide-react';
 import { listSnapshots, getChunkSize } from '../../../services/api';
 import SnapshotHistoryList from './SnapshotHistoryList';
+import PageHeader from '../../shared/PageHeader';
 
 export default function SnapshotHistoryView({ tenant }) {
   const [snapshots, setSnapshots] = useState([]);
@@ -39,45 +40,23 @@ export default function SnapshotHistoryView({ tenant }) {
   const formattedTotalMB = (totalSizeBytes / (1024 * 1024)).toFixed(2);
 
   return (
-    <div className="w-full flex-1 space-y-6 text-left font-sans bg-[#f8fafc] min-h-[calc(100vh-100px)] flex flex-col justify-between">
+    <div className="w-full space-y-6 text-left font-sans flex flex-col justify-between flex-1">
       <div>
         {/* Header */}
-        <div className="bg-gradient-to-r from-white via-slate-50 to-orange-50/40 border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xs relative overflow-hidden mb-6 text-slate-900 text-left">
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <ShieldCheck size={13} className="text-emerald-600" /> master.csv Audit Log
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-orange-50 text-[#f95716] border border-orange-200">
-                  <Database size={13} className="text-[#f95716]" /> FastCDC Engine Sliced
-                </span>
-              </div>
-
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#f95716] text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
-                  <Database size={22} />
-                </div>
-                <span>CDC Master Vault Snapshots</span>
-              </h1>
-
-              <p className="text-slate-500 text-xs sm:text-sm font-normal max-w-2xl leading-relaxed">
-                Dedicated snapshot manifest repository for tenant workspace <code className="font-mono text-[#f95716] font-bold bg-orange-50 px-2 py-0.5 rounded border border-orange-200">{tenant?.subdomain || 'willsparrow'}</code>. Browse timestamped database snapshots and download chunk hash details JSON files.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0">
+        <PageHeader
+            icon={FileText}
+            title="CDC Master Vault Snapshots"
+            description={`Snapshot manifest for tenant ${tenant?.subdomain || 'willsparrow'} — Browse timestamped database snapshots`}
+            actions={
               <button
                 onClick={loadData}
                 disabled={isRefreshing}
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+                className="h-9 px-3.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-[#f95716]' : 'text-slate-500'} />
-                <span>Refresh Snapshots</span>
+                <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-[#f95716]' : 'text-slate-400'} /> Refresh
               </button>
-            </div>
-          </div>
-        </div>
+            }
+          />
 
         {/* Loading / List */}
         {loading ? (
