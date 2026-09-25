@@ -71,8 +71,8 @@ export default function SnapshotHistoryList({ snapshots, onRefresh }) {
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <h4 className="font-bold text-slate-900 text-base flex items-center gap-2 font-mono">
-                    <Hash size={16} className="text-[#f95716]" />
+                  <h4 className="text-[13px] font-black text-slate-900 truncate flex items-center gap-2">
+                    <Hash size={12} className="text-[#f95716] text-bold" />
                     <span>Snapshot: {s.id}</span>
                   </h4>
 
