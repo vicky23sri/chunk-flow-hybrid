@@ -1,18 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Cloud, Zap, Server, HardDrive, Layers, Globe, Sparkles, Loader2 } from 'lucide-react';
-
-const ICON_MAP = {
-  postgres: Database,
-  mysql: Database,
-  kafka: Zap,
-  mongodb: Server,
-  webhook: Globe,
-  s3: Cloud,
-  gcs: Cloud,
-  redis: HardDrive,
-  snowflake: Layers,
-  pinecone: Sparkles,
-};
+import { Database, Loader2, Sparkles } from 'lucide-react';
+import { ICON_MAP } from '../../../utils/nodeHelpers';
 
 const COLOR_MAP = {
   blue: { badge: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-600', text: 'group-hover:text-blue-600', border: 'hover:border-blue-500/60' },

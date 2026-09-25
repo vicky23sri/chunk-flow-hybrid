@@ -120,10 +120,10 @@ type CDCRunnerResult struct {
 func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResult, error) {
 	start := time.Now()
 	if subdomain == "" {
-		subdomain = "default"
+		return nil, fmt.Errorf("cdc_runner: subdomain is required")
 	}
 	if workflowName == "" {
-		workflowName = "PostgreSQL -> S3 FastCDC Stream"
+		workflowName = "PostgreSQL"
 	}
 
 	conn, tenantDB, err := db.OpenTenantDB(subdomain)
@@ -154,7 +154,7 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 	}
 
 	if len(tables) == 0 {
-		tables = []string{"source_configurations", "destination_configurations", "workflow_deployments"}
+		tables = []string{}
 	}
 
 	// 2. Obtain real database snapshot dump payload via pg_dump CLI (matching chunk-flow)
@@ -201,21 +201,35 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 		}
 	}
 	if s3Bucket == "" {
-		s3Bucket = fmt.Sprintf("chunkflow-vault-%s", subdomain)
+		return nil, fmt.Errorf("S3 Bucket Name is required in node configuration")
 	}
 	if s3Region == "" {
-		s3Region = "us-east-1"
+		s3Region = os.Getenv("AWS_REGION")
 	}
-	if s3Folder == "" {
-		s3Folder = "raw/chunkflow"
-	}
-	s3Folder = strings.Trim(s3Folder, "/")
-	if s3Folder == "" {
-		s3Folder = "raw"
+	if s3Region == "" {
+		return nil, fmt.Errorf("S3 Region is required in node configuration")
 	}
 
-	s3Key := fmt.Sprintf("%s/%s_%d.cdc", s3Folder, strings.ToLower(strings.ReplaceAll(workflowName, " ", "_")), time.Now().Unix())
-	destKey := fmt.Sprintf("s3://%s/%s", s3Bucket, s3Key)
+	// Base folder specified by user in UI (e.g. "mybackups" or empty)
+	s3Folder = strings.Trim(s3Folder, "/")
+	
+	// 1. Shared Chunk Pool Prefix (enables cross-deployment deduplication across all snapshot runs)
+	var chunkPrefix string
+	if s3Folder != "" {
+		chunkPrefix = fmt.Sprintf("%s/chunks/", s3Folder)
+	} else {
+		chunkPrefix = "chunks/"
+	}
+
+	// 2. Unique Snapshot Manifest Folder (created fresh for every deploy workflow run with date & unique manifest ID)
+	dateStr := now.Format("2006-01-02")
+	var snapshotPrefix string
+	if s3Folder != "" {
+		snapshotPrefix = fmt.Sprintf("%s/snapshots/%s/%s/", s3Folder, dateStr, manifestID)
+	} else {
+		snapshotPrefix = fmt.Sprintf("snapshots/%s/%s/", dateStr, manifestID)
+	}
+	destKey := fmt.Sprintf("s3://%s/%s", s3Bucket, snapshotPrefix)
 
 	// 5. Persist local CDC vault backup chunk artifact & dump
 	_ = os.MkdirAll("logs/vault", 0755)
@@ -225,7 +239,7 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 	dumpFile := filepath.Join("logs/vault", fmt.Sprintf("%s.dump", manifestID))
 	_ = os.WriteFile(dumpFile, bytePayload, 0644)
 
-	// 6. Upload to real AWS S3 using AWS SDK
+	// 6. Upload individual CDC chunks to AWS S3 by SHA-256 hash (with deduplication across past deployments)
 	if s3AccessKey != "" && s3SecretKey != "" {
 		awsCfg := aws.NewConfig().
 			WithRegion(s3Region).
@@ -233,17 +247,72 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 		sess, err := session.NewSession(awsCfg)
 		if err == nil {
 			s3Svc := s3.New(sess)
-			_, err = s3Svc.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(s3Bucket),
-				Key:    aws.String(s3Key),
-				Body:   bytes.NewReader(bytePayload),
-			})
-			if err != nil {
-				log.Printf("[S3 UPLOAD ERROR] Failed to upload CDC file to S3: %v", err)
-				return nil, fmt.Errorf("failed to upload CDC file to S3: %v", err)
-			} else {
-				log.Printf("[S3 UPLOAD SUCCESS] Uploaded to %s", destKey)
+			seenInStream := make(map[string]bool)
+			uploadedCount := 0
+			dedupCount := 0
+			var uploadedBytes int64 = 0
+
+			for _, c := range chunkRes.Chunks {
+				if seenInStream[c.Hash] {
+					dedupCount++
+					log.Printf("[LOCAL DEDUPE] Chunk %s... -> REPEATED in stream ✓ (Local deduplicated)", c.Hash[:12])
+					continue
+				}
+				seenInStream[c.Hash] = true
+
+				chunkKey := chunkPrefix + c.Hash
+
+				// S3 deduplication check across all snapshots (HeadObject)
+				_, headErr := s3Svc.HeadObject(&s3.HeadObjectInput{
+					Bucket: aws.String(s3Bucket),
+					Key:    aws.String(chunkKey),
+				})
+
+				if headErr == nil {
+					dedupCount++
+					log.Printf("[S3 DEDUPE] Chunk %s... -> EXISTS in S3 ✓ (Deduplicated across deployments)", c.Hash[:12])
+					continue
+				}
+
+				// Upload chunk bytes to S3 shared chunk pool
+				chunkData := bytePayload[c.Offset : c.Offset+int64(c.Size)]
+				log.Printf("[S3 PUT] Uploading new chunk -> s3://%s/%s (%d bytes)...", s3Bucket, chunkKey, len(chunkData))
+				_, err = s3Svc.PutObject(&s3.PutObjectInput{
+					Bucket: aws.String(s3Bucket),
+					Key:    aws.String(chunkKey),
+					Body:   bytes.NewReader(chunkData),
+				})
+				if err != nil {
+					log.Printf("[S3 UPLOAD ERROR] Failed uploading chunk s3://%s/%s: %v", s3Bucket, chunkKey, err)
+					return nil, fmt.Errorf("failed to upload chunk %s to S3: %v", c.Hash[:12], err)
+				}
+				uploadedCount++
+				uploadedBytes += int64(len(chunkData))
+				log.Printf("[S3 PUT SUCCESS] Uploaded s3://%s/%s ✓", s3Bucket, chunkKey)
 			}
+
+			// Upload unique snapshot manifest.json for this deploy run
+			manifestBytes, _ := json.MarshalIndent(map[string]interface{}{
+				"manifest_id":   manifestID,
+				"subdomain":     subdomain,
+				"workflow_name": workflowName,
+				"timestamp":     now.Format(time.RFC3339),
+				"total_bytes":   chunkRes.TotalBytes,
+				"total_chunks":  chunkRes.TotalChunks,
+				"unique_chunks": chunkRes.UniqueChunks,
+				"dedup_ratio":   chunkRes.DedupRatio,
+				"chunks":        chunkRes.Chunks,
+			}, "", "  ")
+
+			manifestKey := snapshotPrefix + "manifest.json"
+			log.Printf("[S3 MANIFEST] Uploading snapshot manifest -> s3://%s/%s", s3Bucket, manifestKey)
+			_, _ = s3Svc.PutObject(&s3.PutObjectInput{
+				Bucket: aws.String(s3Bucket),
+				Key:    aws.String(manifestKey),
+				Body:   bytes.NewReader(manifestBytes),
+			})
+
+			log.Printf("[S3 UPLOAD COMPLETE] Uploaded %d new chunks (%d bytes), deduplicated %d chunks to %s", uploadedCount, uploadedBytes, dedupCount, destKey)
 		} else {
 			log.Printf("[S3 SESSION ERROR] Failed to create AWS session: %v", err)
 			return nil, fmt.Errorf("failed to create AWS session: %v", err)

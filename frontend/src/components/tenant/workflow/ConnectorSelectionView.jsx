@@ -4,6 +4,7 @@ import {
   RefreshCw, Search, Server, Key, GitMerge, ArrowRight, Lock, Box
 } from 'lucide-react';
 import CreateConnectorModal from './CreateConnectorModal';
+import PageHeader from '../../shared/PageHeader';
 
 export default function ConnectorSelectionView({ connectors, onSelectConnector, onAddConnector }) {
   const [selectedPayload, setSelectedPayload] = useState(null);
@@ -22,7 +23,7 @@ export default function ConnectorSelectionView({ connectors, onSelectConnector, 
   };
 
   return (
-    <div className="flex flex-col gap-5 min-h-[calc(100vh-125px)]">
+    <div className="space-y-6 flex-1 flex flex-col">
 
       <style>{`
         @keyframes live-glow {
@@ -39,29 +40,24 @@ export default function ConnectorSelectionView({ connectors, onSelectConnector, 
       `}</style>
 
       {/* ─── Page Header ───────────────────────────────────────── */}
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
-        <div className="absolute -right-16 -top-16 w-56 h-56 bg-orange-100 rounded-full opacity-30 blur-3xl pointer-events-none" />
-        <div className="flex items-center gap-3.5 relative">
-          <div className="w-11 h-11 rounded-2xl bg-[#f95716] flex items-center justify-center shadow-lg shadow-orange-400/30 shrink-0">
-            <Zap size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">Workflow Builder Canvas</h1>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">Design and orchestrate your FastCDC data pipelines</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 relative shrink-0">
-          <button className="h-9 px-3.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors">
-            <RefreshCw size={13} className="text-slate-400" /> Refresh
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="h-9 px-4 bg-[#f95716] hover:bg-orange-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-md shadow-orange-400/25"
-          >
-            <Plus size={15} strokeWidth={2.5} /> New Connector
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon={Zap}
+        title="Workflow Builder Canvas"
+        description="Design and orchestrate your FastCDC data pipelines"
+        actions={
+          <>
+            <button className="h-9 px-3.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors">
+              <RefreshCw size={13} className="text-slate-400" /> Refresh
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="h-9 px-4 bg-[#f95716] hover:bg-orange-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-md shadow-orange-400/25"
+            >
+              <Plus size={15} strokeWidth={2.5} /> New Connector
+            </button>
+          </>
+        }
+      />
 
       {/* ─── Table Panel ───────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
