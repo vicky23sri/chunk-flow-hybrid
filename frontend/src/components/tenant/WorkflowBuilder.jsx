@@ -417,7 +417,8 @@ export default function WorkflowBuilder({ tenant, onSaveWorkflow, initialWorkflo
     const s3Node = nodes.find((n) => n.subtype === 's3');
 
     const res = await api.deployWorkflow({
-      workflowName: postgresNode?.config?.name || 'PostgreSQL -> S3 Vault Data Pipeline',
+      connector_id: initialWorkflow?.id || 'default_connector',
+      workflowName: initialWorkflow?.name || 'Database to s3 connector',
       nodes,
       connections,
       postgres: postgresNode?.config,

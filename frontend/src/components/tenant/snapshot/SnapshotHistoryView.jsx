@@ -62,7 +62,7 @@ export default function SnapshotHistoryView({ tenant }) {
         {loading ? (
           <div className="bg-white border border-slate-200 rounded-3xl py-20 text-center text-slate-400 font-mono text-xs flex flex-col items-center justify-center gap-3 shadow-xs">
             <RefreshCw size={28} className="animate-spin text-[#f95716]" />
-            <span>Loading master.csv CDC snapshots...</span>
+            <span>Loading CDC Vault snapshots from database...</span>
           </div>
         ) : (
           <SnapshotHistoryList snapshots={snapshots} onRefresh={loadData} />
@@ -73,7 +73,7 @@ export default function SnapshotHistoryView({ tenant }) {
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-xs text-slate-500 font-mono flex flex-wrap justify-between items-center gap-3 shadow-xs mt-6">
         <div className="flex items-center gap-2">
           <HardDrive size={13} className="text-slate-400" />
-          <span>Audit Log File: <code className="text-slate-800 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">logs/vault/master.csv</code></span>
+          <span>Vault Table: <code className="text-slate-800 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">cdc_snapshot_vaults</code></span>
         </div>
 
         <div className="flex items-center gap-4 text-slate-600 font-medium">

@@ -204,7 +204,7 @@ export default function Dashboard({ user, tenant, onTenantChange }) {
       group: 'BACKUP & PIPELINES',
       items: [
         { id: 'snapshots', label: 'Active Pipelines', icon: Database, badge: activePipelinesCount > 0 ? String(activePipelinesCount) : null },
-        { id: 'history_snapshots', label: 'CDC Snapshots', icon: FileText, badge: 'master.csv' },
+        { id: 'history_snapshots', label: 'CDC Snapshots', icon: FileText, badge: 'vault DB' },
         // { id: 'scheduler', label: 'Backup Scheduler', icon: Clock, badge: 'Cron' },
       ],
     },

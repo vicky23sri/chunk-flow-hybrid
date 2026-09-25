@@ -60,17 +60,22 @@ func DeployWorkflow(c *gin.Context) {
 	defer cancel()
 
 	workflowName := req.WorkflowName
-	if workflowName == "" {
-		workflowName = "PostgreSQL -> S3 Backup Pipeline"
+	if workflowName == "" || workflowName == "Portiq" {
+		workflowName = "Database to s3 connector"
 	}
 
 	// 1. Resolve or create Connector ID
 	connID := req.ConnectorID
-	if connID == "" {
-		_ = conn.QueryRowContext(ctx, `SELECT id FROM connectors ORDER BY created_at ASC LIMIT 1`).Scan(&connID)
+	if connID == "" || connID == "default_connector" {
+		_ = conn.QueryRowContext(ctx, `SELECT id FROM connectors WHERE name = $1 LIMIT 1`, workflowName).Scan(&connID)
+		if connID == "" {
+			_ = conn.QueryRowContext(ctx, `SELECT id FROM connectors ORDER BY created_at ASC LIMIT 1`).Scan(&connID)
+		}
 		if connID == "" {
 			_ = conn.QueryRowContext(ctx, `INSERT INTO connectors (name) VALUES ($1) RETURNING id`, workflowName).Scan(&connID)
 		}
+	} else if connID != "" && workflowName != "" {
+		_, _ = conn.ExecContext(ctx, `UPDATE connectors SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, workflowName, connID)
 	}
 
 	// (Configurations table logic removed as node data is directly mapped from canvas_nodes)

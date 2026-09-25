@@ -30,9 +30,11 @@ func OpenTenantDB(subdomain string) (*sql.DB, string, error) {
 }
 
 // NullableString converts an empty string to nil so it is stored as SQL NULL.
+
 func NullableString(s string) interface{} {
 	if s == "" {
 		return nil
 	}
 	return s
 }
+

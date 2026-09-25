@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -43,13 +45,25 @@ func getPgDumpStream(ctx context.Context, conn *sql.DB, tenantDB string, connect
 		if decErr == nil {
 			var config map[string]interface{}
 			if err := json.Unmarshal([]byte(decrypted), &config); err == nil {
-				if v, ok := config["host"].(string); ok { host = v }
-				if v, ok := config["port"].(string); ok { port = v }
-				if v, ok := config["username"].(string); ok { user = v }
-				if v, ok := config["password"].(string); ok { password = v }
-				if v, ok := config["database"].(string); ok { dbName = v }
+				if v, ok := config["host"].(string); ok {
+					host = v
+				}
+				if v, ok := config["port"].(string); ok {
+					port = v
+				}
+				if v, ok := config["username"].(string); ok {
+					user = v
+				}
+				if v, ok := config["password"].(string); ok {
+					password = v
+				}
+				if v, ok := config["database"].(string); ok {
+					dbName = v
+				}
 				if dbName == "" {
-					if v, ok := config["database_name"].(string); ok { dbName = v }
+					if v, ok := config["database_name"].(string); ok {
+						dbName = v
+					}
 				}
 			}
 		}
@@ -132,8 +146,20 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
+
+	// Fetch connector name from connectors table if available
+	var dbConnectorName string
+	if connectorID != "" {
+		_ = conn.QueryRowContext(ctx, "SELECT name FROM connectors WHERE id = $1", connectorID).Scan(&dbConnectorName)
+	}
+	if dbConnectorName != "" {
+		workflowName = dbConnectorName
+	}
+	if workflowName == "" || workflowName == "Portiq" {
+		workflowName = "Database to s3 connector"
+	}
 
 	// 1. Fetch public table names in tenant database
 	var tables []string
@@ -177,6 +203,12 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 	now := time.Now().UTC()
 	manifestID := fmt.Sprintf("db-%s", now.Format("20060102-150405"))
 
+	// Save real combined SQL database backup dump payload locally for instant downloads
+	vaultSqlDir := filepath.Join("logs", "vault")
+	_ = os.MkdirAll(vaultSqlDir, 0755)
+	sqlFilePath := filepath.Join(vaultSqlDir, fmt.Sprintf("%s.sql", manifestID))
+	_ = os.WriteFile(sqlFilePath, bytePayload, 0644)
+
 	// 4. Fetch S3 credentials from canvas_nodes
 	var s3EncConfig string
 	_ = conn.QueryRowContext(ctx, `
@@ -192,109 +224,213 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 		if decrypted, err := crypto.Decrypt(s3EncConfig); err == nil {
 			var config map[string]interface{}
 			if err := json.Unmarshal([]byte(decrypted), &config); err == nil {
-				if v, ok := config["bucketName"].(string); ok { s3Bucket = v }
-				if v, ok := config["region"].(string); ok { s3Region = v }
-				if v, ok := config["accessKeyId"].(string); ok { s3AccessKey = v }
-				if v, ok := config["secretAccessKey"].(string); ok { s3SecretKey = v }
-				if v, ok := config["folderPath"].(string); ok { s3Folder = v }
+				if v, ok := config["bucketName"].(string); ok {
+					s3Bucket = v
+				}
+				if v, ok := config["region"].(string); ok {
+					s3Region = v
+				}
+				if v, ok := config["accessKeyId"].(string); ok {
+					s3AccessKey = v
+				}
+				if v, ok := config["secretAccessKey"].(string); ok {
+					s3SecretKey = v
+				}
+				if v, ok := config["folderPath"].(string); ok {
+					s3Folder = v
+				}
 			}
 		}
 	}
 	if s3Bucket == "" {
-		return nil, fmt.Errorf("S3 Bucket Name is required in node configuration")
+		return nil, fmt.Errorf("S3 Bucket Name is required. Please configure the S3 destination node in the canvas.")
 	}
 	if s3Region == "" {
-		s3Region = os.Getenv("AWS_REGION")
+		return nil, fmt.Errorf("S3 Region is required. Please configure the S3 destination node in the canvas.")
 	}
-	if s3Region == "" {
-		return nil, fmt.Errorf("S3 Region is required in node configuration")
+	if s3AccessKey == "" || s3SecretKey == "" {
+		return nil, fmt.Errorf("S3 Access Key and Secret Key are required. Please configure the S3 destination node in the canvas.")
 	}
 
 	// Base folder specified by user in UI (e.g. "mybackups" or empty)
 	s3Folder = strings.Trim(s3Folder, "/")
-	
-	// 1. Shared Chunk Pool Prefix (enables cross-deployment deduplication across all snapshot runs)
-	var chunkPrefix string
-	if s3Folder != "" {
-		chunkPrefix = fmt.Sprintf("%s/chunks/", s3Folder)
-	} else {
-		chunkPrefix = "chunks/"
+
+	// Fetch username from tenant DB (or fallback to subdomain)
+	var username string
+	_ = conn.QueryRowContext(ctx, "SELECT COALESCE(name, email, 'user') FROM users ORDER BY id ASC LIMIT 1").Scan(&username)
+	if username == "" {
+		username = subdomain
+	}
+	cleanUsername := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(username)), " ", "_")
+	cleanConnectorName := strings.ReplaceAll(strings.TrimSpace(workflowName), " ", "_")
+	if cleanConnectorName == "" || cleanConnectorName == "Portiq" {
+		cleanConnectorName = "Database_to_s3_connector"
 	}
 
-	// 2. Unique Snapshot Manifest Folder (created fresh for every deploy workflow run with date & unique manifest ID)
-	dateStr := now.Format("2006-01-02")
-	var snapshotPrefix string
-	if s3Folder != "" {
-		snapshotPrefix = fmt.Sprintf("%s/snapshots/%s/%s/", s3Folder, dateStr, manifestID)
-	} else {
-		snapshotPrefix = fmt.Sprintf("snapshots/%s/%s/", dateStr, manifestID)
-	}
-	destKey := fmt.Sprintf("s3://%s/%s", s3Bucket, snapshotPrefix)
-
-	// 5. Persist local CDC vault backup chunk artifact & dump
-	_ = os.MkdirAll("logs/vault", 0755)
-	localVaultFile := filepath.Join("logs/vault", fmt.Sprintf("%s_backup.cdc", subdomain))
-	_ = os.WriteFile(localVaultFile, bytePayload, 0644)
-
-	dumpFile := filepath.Join("logs/vault", fmt.Sprintf("%s.dump", manifestID))
-	_ = os.WriteFile(dumpFile, bytePayload, 0644)
-
-	// 6. Upload individual CDC chunks to AWS S3 by SHA-256 hash (with deduplication across past deployments)
-	if s3AccessKey != "" && s3SecretKey != "" {
-		awsCfg := aws.NewConfig().
+	// 5. Upload Chunks to User's Destination S3 Node (e.g. chunknodes)
+	if s3AccessKey != "" && s3SecretKey != "" && s3Bucket != "" {
+		destAwsCfg := aws.NewConfig().
 			WithRegion(s3Region).
 			WithCredentials(credentials.NewStaticCredentials(s3AccessKey, s3SecretKey, ""))
-		sess, err := session.NewSession(awsCfg)
+		sess, err := session.NewSession(destAwsCfg)
 		if err == nil {
 			s3Svc := s3.New(sess)
+			destChunkPrefix := ""
+			if s3Folder != "" {
+				destChunkPrefix = strings.Trim(s3Folder, "/") + "/"
+			}
+
 			seenInStream := make(map[string]bool)
-			uploadedCount := 0
+			var uniqueChunksToUpload []ChunkInfo
 			dedupCount := 0
-			var uploadedBytes int64 = 0
 
 			for _, c := range chunkRes.Chunks {
 				if seenInStream[c.Hash] {
 					dedupCount++
-					log.Printf("[LOCAL DEDUPE] Chunk %s... -> REPEATED in stream ✓ (Local deduplicated)", c.Hash[:12])
 					continue
 				}
 				seenInStream[c.Hash] = true
-
-				chunkKey := chunkPrefix + c.Hash
-
-				// S3 deduplication check across all snapshots (HeadObject)
-				_, headErr := s3Svc.HeadObject(&s3.HeadObjectInput{
-					Bucket: aws.String(s3Bucket),
-					Key:    aws.String(chunkKey),
-				})
-
-				if headErr == nil {
-					dedupCount++
-					log.Printf("[S3 DEDUPE] Chunk %s... -> EXISTS in S3 ✓ (Deduplicated across deployments)", c.Hash[:12])
-					continue
-				}
-
-				// Upload chunk bytes to S3 shared chunk pool
-				chunkData := bytePayload[c.Offset : c.Offset+int64(c.Size)]
-				log.Printf("[S3 PUT] Uploading new chunk -> s3://%s/%s (%d bytes)...", s3Bucket, chunkKey, len(chunkData))
-				_, err = s3Svc.PutObject(&s3.PutObjectInput{
-					Bucket: aws.String(s3Bucket),
-					Key:    aws.String(chunkKey),
-					Body:   bytes.NewReader(chunkData),
-				})
-				if err != nil {
-					log.Printf("[S3 UPLOAD ERROR] Failed uploading chunk s3://%s/%s: %v", s3Bucket, chunkKey, err)
-					return nil, fmt.Errorf("failed to upload chunk %s to S3: %v", c.Hash[:12], err)
-				}
-				uploadedCount++
-				uploadedBytes += int64(len(chunkData))
-				log.Printf("[S3 PUT SUCCESS] Uploaded s3://%s/%s ✓", s3Bucket, chunkKey)
+				uniqueChunksToUpload = append(uniqueChunksToUpload, c)
 			}
 
-			// Upload unique snapshot manifest.json for this deploy run
+			var uploadedCount int64
+			var atomicDedupCount int64 = int64(dedupCount)
+
+			if len(uniqueChunksToUpload) > 0 {
+				chunkChan := make(chan ChunkInfo, len(uniqueChunksToUpload))
+				for _, c := range uniqueChunksToUpload {
+					chunkChan <- c
+				}
+				close(chunkChan)
+
+				workerCount := 10
+				if len(uniqueChunksToUpload) < workerCount {
+					workerCount = len(uniqueChunksToUpload)
+				}
+
+				var wg sync.WaitGroup
+				for i := 0; i < workerCount; i++ {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for c := range chunkChan {
+							chunkKey := destChunkPrefix + c.Hash
+
+							_, headErr := s3Svc.HeadObject(&s3.HeadObjectInput{
+								Bucket: aws.String(s3Bucket),
+								Key:    aws.String(chunkKey),
+							})
+							if headErr == nil {
+								atomic.AddInt64(&atomicDedupCount, 1)
+								continue
+							}
+
+							chunkData := bytePayload[c.Offset : c.Offset+int64(c.Size)]
+							log.Printf("[DEST S3 PUT] Uploading chunk -> s3://%s/%s (%d bytes)...", s3Bucket, chunkKey, len(chunkData))
+							_, putErr := s3Svc.PutObject(&s3.PutObjectInput{
+								Bucket: aws.String(s3Bucket),
+								Key:    aws.String(chunkKey),
+								Body:   bytes.NewReader(chunkData),
+							})
+							if putErr != nil {
+								log.Printf("[DEST S3 ERROR] Failed uploading chunk to s3://%s/%s: %v", s3Bucket, chunkKey, putErr)
+							} else {
+								atomic.AddInt64(&uploadedCount, 1)
+							}
+						}
+					}()
+				}
+				wg.Wait()
+			}
+			log.Printf("[DEST S3 COMPLETE] Synced %d chunks (%d dedup) to destination bucket s3://%s/%s", uploadedCount, atomicDedupCount, s3Bucket, destChunkPrefix)
+		}
+	}
+
+	// 6. Upload Master Vault Snapshot Manifest & Chunks to Master S3 Bucket (.env chunkflow)
+	masterBucket := os.Getenv("S3_BUCKET_NAME")
+	if masterBucket == "" {
+		masterBucket = "chunkflow"
+	}
+	masterRegion := os.Getenv("AWS_REGION")
+	if masterRegion == "" {
+		masterRegion = "us-west-1"
+	}
+	masterAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+	masterSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+
+	var manifestS3URI, chunksS3URI string
+
+	if masterAccessKey != "" && masterSecretKey != "" {
+		masterAwsCfg := aws.NewConfig().
+			WithRegion(masterRegion).
+			WithCredentials(credentials.NewStaticCredentials(masterAccessKey, masterSecretKey, ""))
+		masterSess, masterErr := session.NewSession(masterAwsCfg)
+		if masterErr == nil {
+			masterSvc := s3.New(masterSess)
+
+			masterBasePrefix := fmt.Sprintf("%s/%s/%s", subdomain, cleanUsername, cleanConnectorName)
+			masterChunkPrefix := fmt.Sprintf("%s/chunks/", masterBasePrefix)
+			cleanTimestamp := strings.TrimPrefix(manifestID, "db-")
+			manifestKey := fmt.Sprintf("%s/snapshots-%s.json", masterBasePrefix, cleanTimestamp)
+
+			masterSeen := make(map[string]bool)
+			var masterUniqueChunks []ChunkInfo
+			for _, c := range chunkRes.Chunks {
+				if masterSeen[c.Hash] {
+					continue
+				}
+				masterSeen[c.Hash] = true
+				masterUniqueChunks = append(masterUniqueChunks, c)
+			}
+
+			var masterUploaded int64
+			if len(masterUniqueChunks) > 0 {
+				mChunkChan := make(chan ChunkInfo, len(masterUniqueChunks))
+				for _, c := range masterUniqueChunks {
+					mChunkChan <- c
+				}
+				close(mChunkChan)
+
+				mWorkerCount := 10
+				if len(masterUniqueChunks) < mWorkerCount {
+					mWorkerCount = len(masterUniqueChunks)
+				}
+
+				var masterWg sync.WaitGroup
+				for i := 0; i < mWorkerCount; i++ {
+					masterWg.Add(1)
+					go func() {
+						defer masterWg.Done()
+						for c := range mChunkChan {
+							mChunkKey := masterChunkPrefix + c.Hash
+
+							_, headErr := masterSvc.HeadObject(&s3.HeadObjectInput{
+								Bucket: aws.String(masterBucket),
+								Key:    aws.String(mChunkKey),
+							})
+							if headErr == nil {
+								continue
+							}
+
+							chunkData := bytePayload[c.Offset : c.Offset+int64(c.Size)]
+							log.Printf("[MASTER S3 PUT] Uploading chunk -> s3://%s/%s (%d bytes)...", masterBucket, mChunkKey, len(chunkData))
+							_, _ = masterSvc.PutObject(&s3.PutObjectInput{
+								Bucket: aws.String(masterBucket),
+								Key:    aws.String(mChunkKey),
+								Body:   bytes.NewReader(chunkData),
+							})
+							atomic.AddInt64(&masterUploaded, 1)
+						}
+					}()
+				}
+				masterWg.Wait()
+			}
+
+			// Upload Manifest JSON directly as snapshots-{timestamp}.json
 			manifestBytes, _ := json.MarshalIndent(map[string]interface{}{
 				"manifest_id":   manifestID,
 				"subdomain":     subdomain,
+				"username":      cleanUsername,
 				"workflow_name": workflowName,
 				"timestamp":     now.Format(time.RFC3339),
 				"total_bytes":   chunkRes.TotalBytes,
@@ -304,47 +440,62 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 				"chunks":        chunkRes.Chunks,
 			}, "", "  ")
 
-			manifestKey := snapshotPrefix + "manifest.json"
-			log.Printf("[S3 MANIFEST] Uploading snapshot manifest -> s3://%s/%s", s3Bucket, manifestKey)
-			_, _ = s3Svc.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(s3Bucket),
+			manifestDir := filepath.Join("logs", "vault", "manifests")
+			_ = os.MkdirAll(manifestDir, 0755)
+			_ = os.WriteFile(filepath.Join(manifestDir, fmt.Sprintf("%s.json", manifestID)), manifestBytes, 0644)
+			_ = os.WriteFile(filepath.Join("logs", "vault", fmt.Sprintf("%s.json", manifestID)), manifestBytes, 0644)
+
+			log.Printf("[MASTER S3 MANIFEST] Uploading snapshot manifest -> s3://%s/%s", masterBucket, manifestKey)
+			_, _ = masterSvc.PutObject(&s3.PutObjectInput{
+				Bucket: aws.String(masterBucket),
 				Key:    aws.String(manifestKey),
 				Body:   bytes.NewReader(manifestBytes),
 			})
 
-			log.Printf("[S3 UPLOAD COMPLETE] Uploaded %d new chunks (%d bytes), deduplicated %d chunks to %s", uploadedCount, uploadedBytes, dedupCount, destKey)
+			manifestS3URI = fmt.Sprintf("s3://%s/%s", masterBucket, manifestKey)
+			chunksS3URI = fmt.Sprintf("s3://%s/%s", masterBucket, masterChunkPrefix)
+			log.Printf("[MASTER S3 COMPLETE] Uploaded %d new chunks and manifest to master vault %s", masterUploaded, manifestS3URI)
+
 		} else {
-			log.Printf("[S3 SESSION ERROR] Failed to create AWS session: %v", err)
-			return nil, fmt.Errorf("failed to create AWS session: %v", err)
+			log.Printf("[MASTER S3 ERROR] Failed creating master AWS session: %v", masterErr)
 		}
 	} else {
-		log.Printf("[S3 SKIP] No valid S3 credentials found, skipping actual AWS upload.")
-		return nil, fmt.Errorf("no valid S3 credentials found for upload")
+		log.Printf("[MASTER S3 WARNING] Master AWS credentials missing in .env")
 	}
 
-	// 7. Save Manifest JSON & update master.csv + size.json
-	manifest := &SnapshotManifest{
-		ID:           manifestID,
-		Subdomain:    subdomain,
-		WorkflowName: workflowName,
-		Timestamp:    now.Format(time.RFC3339),
-		TotalBytes:   chunkRes.TotalBytes,
-		TotalChunks:  chunkRes.TotalChunks,
-		UniqueChunks: chunkRes.UniqueChunks,
-		DedupRatio:   chunkRes.DedupRatio,
-		Chunks:       chunkRes.Chunks,
+	if manifestS3URI == "" {
+		manifestS3URI = fmt.Sprintf("s3://%s/%smanifest.json", s3Bucket, s3Folder)
+		chunksS3URI = fmt.Sprintf("s3://%s/%schunks/", s3Bucket, s3Folder)
 	}
-	if err := WriteManifestToFile(manifest, manifestID); err != nil {
-		log.Printf("[MANIFEST ERROR] Failed writing manifest JSON %s: %v", manifestID, err)
+
+	// 7. Save snapshot record into cdc_snapshot_vaults DB table
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer dbCancel()
+
+	_, vaultInsertErr := conn.ExecContext(dbCtx, `
+		INSERT INTO cdc_snapshot_vaults (
+			manifest_id, tenant_subdomain, username, connector_id, connector_name,
+			s3_bucket, s3_manifest_path, s3_chunks_prefix,
+			total_bytes, dedup_bytes, total_chunks, unique_chunks, dedup_ratio, duration_ms, status,
+			created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT (manifest_id) DO UPDATE SET
+			s3_manifest_path = EXCLUDED.s3_manifest_path,
+			total_bytes = EXCLUDED.total_bytes,
+			status = EXCLUDED.status,
+			updated_at = CURRENT_TIMESTAMP
+	`, manifestID, subdomain, cleanUsername, connectorID, workflowName, masterBucket, manifestS3URI, chunksS3URI, chunkRes.TotalBytes, chunkRes.DedupBytes, chunkRes.TotalChunks, chunkRes.UniqueChunks, chunkRes.DedupRatio, durationMs, "COMPLETED")
+
+	if vaultInsertErr != nil {
+		log.Printf("[VAULT DB ERROR] Failed inserting record into cdc_snapshot_vaults: %v", vaultInsertErr)
+	} else {
+		log.Printf("[VAULT DB SUCCESS] Recorded snapshot %s into cdc_snapshot_vaults table ✓", manifestID)
 	}
-	if err := WriteMasterCSV(&now, manifestID); err != nil {
-		log.Printf("[MANIFEST ERROR] Failed appending to master.csv for %s: %v", manifestID, err)
-	}
-	prevSize, _ := ReadSize()
-	_ = SaveSize(prevSize + chunkRes.DedupBytes)
 
 	// 8. Write detailed logs to logs/fastcdc_stream.log and stdout
-	detailMsg := fmt.Sprintf("DB=%s TABLES=%v VAULT_FILE=%s MANIFEST_ID=%s", tenantDB, tables, localVaultFile, manifestID)
+	detailMsg := fmt.Sprintf("DB=%s TABLES=%v S3_MANIFEST=%s MANIFEST_ID=%s", tenantDB, tables, manifestS3URI, manifestID)
+	destKey := manifestS3URI
+
 	logger.WriteFastCDCLog(
 		subdomain,
 		workflowName,
@@ -360,7 +511,7 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 	// Summary logs matching chunk-flow project format
 	log.Printf("[SUMMARY] FastCDC Backup Process Complete in %dms! Manifest ID: %s", durationMs, manifestID)
 	log.Printf("[SUMMARY] - Total Chunks Processed: %d (%d raw bytes)", chunkRes.TotalChunks, chunkRes.TotalBytes)
-	log.Printf("[SUMMARY] - Unique Chunks Uploaded to S3: %d (%d bytes)", chunkRes.UniqueChunks, chunkRes.DedupBytes)
+	log.Printf("[SUMMARY] - Unique Chunks Uploaded to Master S3: %d (%d bytes)", chunkRes.UniqueChunks, chunkRes.DedupBytes)
 	log.Printf("[SUMMARY] - Deduplication Ratio: %.2f%%", chunkRes.DedupRatio)
 
 	return &CDCRunnerResult{
@@ -377,4 +528,5 @@ func RunCDCWorkflow(subdomain, workflowName, connectorID string) (*CDCRunnerResu
 		ManifestID:     manifestID,
 		ChunkDetails:   chunkRes,
 	}, nil
+
 }

@@ -57,9 +57,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		// FastCDC Snapshot Management Routes
 		v1.GET("/list-snapshots", handlers.ListSnapshots)
 		v1.GET("/snapshots", handlers.ListSnapshots)
+		v1.GET("/snapshot-manifest", handlers.GetSnapshotManifest)
+		v1.GET("/snapshot-vault", handlers.GetSnapshotVault)
 		v1.GET("/chunk-size", handlers.GetChunkSize)
 		v1.POST("/download", handlers.DownloadSnapshot)
 		v1.POST("/download-snapshot", handlers.DownloadSnapshot)
+
 	}
 
 	return router

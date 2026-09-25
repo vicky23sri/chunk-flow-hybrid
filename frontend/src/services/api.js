@@ -382,10 +382,13 @@ export const api = {
     }
   },
       
-  // ─── Go Backend: List CDC snapshots from master.csv ───────────────────────
+  // ─── Go Backend: List CDC snapshots from tenant DB table ───
   listSnapshots: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
     try {
-      const res = await fetch(`${GO_API_BASE}/list-snapshots`);
+      const res = await fetch(`${GO_API_BASE}/list-snapshots?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: { 'X-Tenant-Subdomain': subdomain },
+      });
       if (!res.ok) return [];
       const data = await res.json().catch(() => []);
       return Array.isArray(data) ? data : [];
@@ -397,8 +400,11 @@ export const api = {
 
   // ─── Go Backend: Get total CDC physical chunk size ────────────────────────
   getChunkSize: async () => {
+    const subdomain = getActiveSubdomain() || 'default';
     try {
-      const res = await fetch(`${GO_API_BASE}/chunk-size`);
+      const res = await fetch(`${GO_API_BASE}/chunk-size?subdomain=${encodeURIComponent(subdomain)}`, {
+        headers: { 'X-Tenant-Subdomain': subdomain },
+      });
       if (!res.ok) return { physical_size_bytes: 0 };
       const data = await res.json().catch(() => ({ physical_size_bytes: 0 }));
       return data;
@@ -408,12 +414,29 @@ export const api = {
     }
   },
 
-  // ─── Go Backend: Download snapshot hash details ─────────────────────────────
+  // ─── Go Backend: Fetch parsed snapshot manifest details ──────────────────────
+  getSnapshotManifest: async (manifestId) => {
+    try {
+      const res = await fetch(`${GO_API_BASE}/snapshot-manifest?id=${encodeURIComponent(manifestId)}`);
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => ({}));
+      return data && data.success ? data.data : null;
+    } catch (err) {
+      console.error('Error fetching snapshot manifest:', err);
+      return null;
+    }
+  },
+
+  // ─── Go Backend: Download SQL database backup dump ─────────────────────────────
   downloadSnapshot: async (manifestId) => {
+    const subdomain = getActiveSubdomain() || 'default';
     try {
       const res = await fetch(`${GO_API_BASE}/download`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Tenant-Subdomain': subdomain,
+        },
         body: JSON.stringify({ id: manifestId }),
       });
       if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
@@ -421,14 +444,14 @@ export const api = {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `snapshot-${manifestId}-hashes.json`;
+      a.download = `database-backup-${manifestId}.sql`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       return true;
     } catch (err) {
-      console.error('Error downloading snapshot hash details:', err);
+      console.error('Error downloading SQL database backup:', err);
       throw err;
     }
   },
@@ -517,6 +540,7 @@ export const getCronLogs = (...args) => api.getCronLogs(...args);
 export const triggerCronJob = (...args) => api.triggerCronJob(...args);
 export const listSnapshots = (...args) => api.listSnapshots(...args);
 export const getChunkSize = (...args) => api.getChunkSize(...args);
+export const getSnapshotManifest = (...args) => api.getSnapshotManifest(...args);
 export const downloadSnapshot = (...args) => api.downloadSnapshot(...args);
 export const getConnectors = (...args) => api.getConnectors(...args);
 export const createConnector = (...args) => api.createConnector(...args);
