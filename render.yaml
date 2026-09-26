@@ -1,0 +1,47 @@
+services:
+  # 1. React Frontend (Static Site - Free)
+  - type: web
+    name: chunk-flow-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_LARAVEL_API_URL
+        value: https://chunk-flow-laravel.onrender.com/api/v1
+      - key: VITE_GO_API_URL
+        value: https://chunk-flow-go.onrender.com/api/v1
+      - key: VITE_APP_NAME
+        value: ChunkFlow
+
+  # 2. Go Backend (Web Service - Free)
+  - type: web
+    name: chunk-flow-go
+    env: go
+    rootDir: go_backend
+    buildCommand: go build -o main ./cmd/main.go
+    startCommand: ./main
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: GIN_MODE
+        value: release
+      - key: APP_ENV
+        value: production
+      - key: DB_SSLMODE
+        value: require
+
+  # 3. Laravel Backend (Docker Web Service - Free)
+  - type: web
+    name: chunk-flow-laravel
+    env: docker
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: PORT
+        value: 8080

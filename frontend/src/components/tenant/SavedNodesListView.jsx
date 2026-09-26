@@ -80,24 +80,24 @@ export default function SavedNodesListView() {
                 Active
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                <span className="h-2 w-2 rounded-full bg-slate-300" />
-                Inactive
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                <Sparkles size={11} className="text-amber-500" />
+                Working On
               </span>
             )}
           </div>
 
           {/* Name + Description */}
-          <h3 className={`text-[15px] font-semibold tracking-[-0.01em] mb-1 transition-colors ${node.is_active ? 'text-slate-900' : 'text-slate-400'}`}>
+          <h3 className={`text-[15px] font-semibold tracking-[-0.01em] mb-1 transition-colors ${node.is_active ? 'text-slate-900' : 'text-slate-700'}`}>
             {brand.name}
           </h3>
-          <p className={`text-[12px] leading-[1.5] line-clamp-2 ${node.is_active ? 'text-slate-500' : 'text-slate-300'}`}>
+          <p className={`text-[12px] leading-[1.5] line-clamp-2 ${node.is_active ? 'text-slate-500' : 'text-slate-400'}`}>
             {brand.desc}
           </p>
 
           {/* Footer */}
           <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className={`text-[11px] font-mono ${node.is_active ? 'text-slate-400' : 'text-slate-300'}`}>
+            <span className={`text-[11px] font-mono ${node.is_active ? 'text-slate-400' : 'text-slate-400'}`}>
               {node.sub_type} · {node.fields_schema?.length || 0} fields
             </span>
             <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all duration-300">
@@ -194,12 +194,12 @@ export default function SavedNodesListView() {
                 {/* Toggle Bar */}
                 <div className="mt-5 flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detailNode.is_active ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                      {detailNode.is_active ? <Check size={16} strokeWidth={3} /> : <Lock size={14} />}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detailNode.is_active ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                      {detailNode.is_active ? <Check size={16} strokeWidth={3} /> : <Sparkles size={14} />}
                     </div>
                     <div>
-                      <div className="text-[13px] font-semibold text-slate-800">{detailNode.is_active ? 'Enabled' : 'Disabled'}</div>
-                      <div className="text-[11px] text-slate-400">{detailNode.is_active ? 'Available on canvas' : 'Hidden from builder'}</div>
+                      <div className="text-[13px] font-semibold text-slate-800">{detailNode.is_active ? 'Enabled' : 'Working On'}</div>
+                      <div className="text-[11px] text-slate-400">{detailNode.is_active ? 'Available on canvas' : 'Driver integration under active development'}</div>
                     </div>
                   </div>
                   <button

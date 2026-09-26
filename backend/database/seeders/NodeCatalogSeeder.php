@@ -163,11 +163,5 @@ class NodeCatalogSeeder extends Seeder
                 $nodeData
             );
         }
-
-        // 4. Seed Default Connector Canvas Project
-        Connector::firstOrCreate(
-            ['name' => 'Database-to-S3 Backup Workflow Builder'],
-            ['status' => 'active']
-        );
     }
 }
